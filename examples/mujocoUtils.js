@@ -27,9 +27,12 @@ export function setupGUI(parentContext) {
   // Add scene selection dropdown.
   let reload = reloadFunc.bind(parentContext);
   parentContext.gui.add(parentContext.params, 'scene', {
-    "Humanoid": "humanoid.xml", "Cassie": "agility_cassie/scene.xml",
-    "Hammock": "hammock.xml", "Balloons": "balloons.xml", "Hand": "shadow_hand/scene_right.xml",
-    "Flag": "flag.xml", "Mug": "mug.xml", "Tendon": "model_with_tendon.xml"
+    "Humanoid": "humanoid.xml",
+    "Hammock": "hammock.xml",
+    "Cassie": "agility_cassie/scene.xml",
+    "Pupper": "Pupper/pupper.xml",
+    "Hand": "shadow_hand/scene_right.xml",
+    "Balloons": "balloons.xml", "Mug": "mug.xml"
   }).name('Example Scene').onChange(reload);
 
   // Add a help menu.
@@ -560,6 +563,37 @@ export async function downloadExampleScenesFolder(mujoco) {
     "mug.obj",
     "mug.png",
     "mug.xml",
+    "Pupper/pupper.xml",
+    "Pupper/assets/AbBracket_Screw_Caps.stl",
+    "Pupper/assets/Abduction_Bracket_V10.stl",
+    "Pupper/assets/BodyV4v70.001.stl",
+    "Pupper/assets/Body_V4.obj",
+    "Pupper/assets/Body_V4_Display.obj",
+    "Pupper/assets/Body_V4_Ears.obj",
+    "Pupper/assets/Body_V4_Glass.obj",
+    "Pupper/assets/Body_V4_Handle.obj",
+    "Pupper/assets/Body_V4_Servos.obj",
+    "Pupper/assets/Body_V4_Strap.obj",
+    // "Pupper/assets/BrushedAluminum.png",
+    // "Pupper/assets/CarbonFiber.png",
+    // "Pupper/assets/CarbonFiber2D.png",
+    // "Pupper/assets/CLS6336HV.png",
+    // "Pupper/assets/Concrete.png",
+    // "Pupper/assets/Fir.png",
+    // "Pupper/assets/Fir2D.png",
+    "Pupper/assets/GIM4305_Mounting_Disc.stl",
+    "Pupper/assets/GIM4305_Servo_Motor.stl",
+    "Pupper/assets/GIM4305_Tab_Connector.stl",
+    "Pupper/assets/LegAssemblyForFlangedv26.001.stl",
+    "Pupper/assets/LegAssemblyForFlangedv26.002.stl",
+    "Pupper/assets/LegAssemblyForFlangedv26.003.stl",
+    "Pupper/assets/Lower_Leg_V6_1.obj",
+    "Pupper/assets/Lower_Leg_V6_2.obj",
+    // "Pupper/assets/Marble.png",
+    // "Pupper/assets/Oak.png",
+    "Pupper/assets/Slate.png",
+    "Pupper/assets/Upper_Leg_0.obj",
+    "Pupper/assets/Upper_Leg_1.obj",
     "scene.xml",
     "shadow_hand/assets/f_distal_pst.obj",
     "shadow_hand/assets/f_knuckle.obj",
