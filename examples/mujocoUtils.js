@@ -268,6 +268,42 @@ function subarray(array, index, size) {
   return array.subarray(offset, offset + size);
 }
 
+function createNewBufferGeometry(model, meshID) {
+  let geometry = new THREE.BufferGeometry();
+
+  let vertex_buffer = model.mesh_vert.subarray(
+     model.mesh_vertadr[meshID] * 3,
+    (model.mesh_vertadr[meshID]  + model.mesh_vertnum[meshID]) * 3);
+  for (let v = 0; v < vertex_buffer.length; v+=3){
+    //vertex_buffer[v + 0] =  vertex_buffer[v + 0];
+    let temp             =  vertex_buffer[v + 1];
+    vertex_buffer[v + 1] =  vertex_buffer[v + 2];
+    vertex_buffer[v + 2] = -temp;
+  }
+
+  let normal_buffer = model.mesh_normal.subarray(
+     model.mesh_vertadr[meshID] * 3,
+    (model.mesh_vertadr[meshID]  + model.mesh_vertnum[meshID]) * 3);
+  for (let v = 0; v < normal_buffer.length; v+=3){
+    //normal_buffer[v + 0] =  normal_buffer[v + 0];
+    let temp             =  normal_buffer[v + 1];
+    normal_buffer[v + 1] =  normal_buffer[v + 2];
+    normal_buffer[v + 2] = -temp;
+  }
+
+  let uv_buffer = model.mesh_texcoord.subarray(
+     model.mesh_texcoordadr[meshID] * 2,
+    (model.mesh_texcoordadr[meshID]  + model.mesh_vertnum[meshID]) * 2);
+  let triangle_buffer = model.mesh_face.subarray(
+     model.mesh_faceadr[meshID] * 3,
+    (model.mesh_faceadr[meshID]  + model.mesh_facenum[meshID]) * 3);
+  geometry.setAttribute("position", new THREE.BufferAttribute(vertex_buffer, 3));
+  geometry.setAttribute("normal"  , new THREE.BufferAttribute(normal_buffer, 3));
+  geometry.setAttribute("uv"      , new THREE.BufferAttribute(    uv_buffer, 2));
+  geometry.setIndex    (Array.from(triangle_buffer));
+  return geometry
+}
+
 /** Loads a scene for MuJoCo
  * @param {mujoco} mujoco This is a reference to the mujoco namespace object
  * @param {string} filename This is the name of the .xml file in the /working/ directory of the MuJoCo/Emscripten Virtual File System
@@ -320,11 +356,7 @@ export async function loadSceneFromURL(mujoco, filename, parent) {
       // Get the body ID and type of the geom.
       let b = model.geom_bodyid[g];
       let type = model.geom_type[g];
-      let size = [
-        model.geom_size[(g*3) + 0],
-        model.geom_size[(g*3) + 1],
-        model.geom_size[(g*3) + 2]
-      ];
+      let size = subarray(model.geom_size, g, 3)
 
       // Create the body if it doesn't exist.
       if (!(b in bodies)) {
@@ -354,38 +386,7 @@ export async function loadSceneFromURL(mujoco, filename, parent) {
         let meshID = model.geom_dataid[g];
 
         if (!(meshID in meshes)) {
-          geometry = new THREE.BufferGeometry(); // TODO: Populate the Buffer Geometry with Generic Mesh Data
-
-          let vertex_buffer = model.mesh_vert.subarray(
-             model.mesh_vertadr[meshID] * 3,
-            (model.mesh_vertadr[meshID]  + model.mesh_vertnum[meshID]) * 3);
-          for (let v = 0; v < vertex_buffer.length; v+=3){
-            //vertex_buffer[v + 0] =  vertex_buffer[v + 0];
-            let temp             =  vertex_buffer[v + 1];
-            vertex_buffer[v + 1] =  vertex_buffer[v + 2];
-            vertex_buffer[v + 2] = -temp;
-          }
-
-          let normal_buffer = model.mesh_normal.subarray(
-             model.mesh_vertadr[meshID] * 3,
-            (model.mesh_vertadr[meshID]  + model.mesh_vertnum[meshID]) * 3);
-          for (let v = 0; v < normal_buffer.length; v+=3){
-            //normal_buffer[v + 0] =  normal_buffer[v + 0];
-            let temp             =  normal_buffer[v + 1];
-            normal_buffer[v + 1] =  normal_buffer[v + 2];
-            normal_buffer[v + 2] = -temp;
-          }
-
-          let uv_buffer = model.mesh_texcoord.subarray(
-             model.mesh_texcoordadr[meshID] * 2,
-            (model.mesh_texcoordadr[meshID]  + model.mesh_vertnum[meshID]) * 2);
-          let triangle_buffer = model.mesh_face.subarray(
-             model.mesh_faceadr[meshID] * 3,
-            (model.mesh_faceadr[meshID]  + model.mesh_facenum[meshID]) * 3);
-          geometry.setAttribute("position", new THREE.BufferAttribute(vertex_buffer, 3));
-          geometry.setAttribute("normal"  , new THREE.BufferAttribute(normal_buffer, 3));
-          geometry.setAttribute("uv"      , new THREE.BufferAttribute(    uv_buffer, 2));
-          geometry.setIndex    (Array.from(triangle_buffer));
+          geometry = createNewBufferGeometry(model, meshID);
           meshes[meshID] = geometry;
         } else {
           geometry = meshes[meshID];
@@ -397,18 +398,11 @@ export async function loadSceneFromURL(mujoco, filename, parent) {
 
       // Set the Material Properties of incoming bodies
       let texture = undefined;
-      let color = [
-        model.geom_rgba[(g * 4) + 0],
-        model.geom_rgba[(g * 4) + 1],
-        model.geom_rgba[(g * 4) + 2],
-        model.geom_rgba[(g * 4) + 3]];
+      let color = subarray(model.geom_rgba, g, 4);
+      let matId = model.geom_matid[g];
+
       if (model.geom_matid[g] != -1) {
-        let matId = model.geom_matid[g];
-        color = [
-          model.mat_rgba[(matId * 4) + 0],
-          model.mat_rgba[(matId * 4) + 1],
-          model.mat_rgba[(matId * 4) + 2],
-          model.mat_rgba[(matId * 4) + 3]];
+        color = subarray(model.mat_rgba, matId, 4);
 
         // Construct Texture from model.tex_rgb
         texture = undefined;
@@ -442,10 +436,10 @@ export async function loadSceneFromURL(mujoco, filename, parent) {
           color: new THREE.Color(color[0], color[1], color[2]),
           transparent: color[3] < 1.0,
           opacity: color[3],
-          specularIntensity: model.geom_matid[g] != -1 ?       model.mat_specular   [model.geom_matid[g]] *0.5 : undefined,
-          reflectivity     : model.geom_matid[g] != -1 ?       model.mat_reflectance[model.geom_matid[g]] : undefined,
-          roughness        : model.geom_matid[g] != -1 ? 1.0 - model.mat_shininess  [model.geom_matid[g]] : undefined,
-          metalness        : model.geom_matid[g] != -1 ? 0.1 : undefined,
+          specularIntensity: matId == -1 ? undefined :       model.mat_specular[matId] * 0.5,
+          reflectivity     : matId == -1 ? undefined :       model.mat_reflectance[matId],
+          roughness        : matId == -1 ? undefined : 1.0 - model.mat_shininess[matId],
+          metalness        : matId == -1 ? undefined : 0.1,
           map              : texture
         });
       }
