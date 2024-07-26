@@ -263,6 +263,11 @@ export function setupGUI(parentContext) {
 }
 
 
+function subarray(array, index, size) {
+  let offset = index * size;
+  return array.subarray(offset, offset + size);
+}
+
 /** Loads a scene for MuJoCo
  * @param {mujoco} mujoco This is a reference to the mujoco namespace object
  * @param {string} filename This is the name of the .xml file in the /working/ directory of the MuJoCo/Emscripten Virtual File System
@@ -420,17 +425,10 @@ export async function loadSceneFromURL(mujoco, filename, parent) {
             rgbaArray[(p * 4) + 2] = rgbArray[offset + ((p * 3) + 2)];
             rgbaArray[(p * 4) + 3] = 1.0;
           }
-          texture = new THREE.DataTexture(rgbaArray, width, height, THREE.RGBAFormat, THREE.UnsignedByteType);
-          if (texId == 2) {
-            texture.repeat = new THREE.Vector2(50, 50);
-            texture.wrapS = THREE.RepeatWrapping;
-            texture.wrapT = THREE.RepeatWrapping;
-          } else {
-            texture.repeat = new THREE.Vector2(1, 1);
-            texture.wrapS = THREE.RepeatWrapping;
-            texture.wrapT = THREE.RepeatWrapping;
-          }
-
+          texture = new THREE.DataTexture(rgbaArray, width, height, THREE.RGBAFormat, THREE.UnsignedByteType
+             , THREE.UVMapping, THREE.RepeatWrapping, THREE.RepeatWrapping);
+          let mat_texrepeat = subarray(model.mat_texrepeat, matId, 2)
+          texture.repeat = new THREE.Vector2(...mat_texrepeat);
           texture.needsUpdate = true;
         }
       }
@@ -454,7 +452,10 @@ export async function loadSceneFromURL(mujoco, filename, parent) {
 
       let mesh = new THREE.Mesh();
       if (type == 0) {
-        mesh = new Reflector( new THREE.PlaneGeometry( 100, 100 ), { clipBias: 0.003,texture: texture } );
+        // 0 values should be set to the far clipping plane rather than 100
+        let x = size[0] == 0 ? 100 : size[0] * 2;
+        let y = size[1] == 0 ? 100 : size[1] * 2;
+        mesh = new Reflector( new THREE.PlaneGeometry( x, y ), { clipBias: 0.003, texture: texture } );
         mesh.rotateX( - Math.PI / 2 );
       } else {
         mesh = new THREE.Mesh(geometry, material);
@@ -590,7 +591,7 @@ export async function downloadExampleScenesFolder(mujoco) {
     "Pupper/assets/Lower_Leg_V6_1.obj",
     "Pupper/assets/Lower_Leg_V6_2.obj",
     // "Pupper/assets/Marble.png",
-    // "Pupper/assets/Oak.png",
+    "Pupper/assets/Oak.png",
     "Pupper/assets/Slate.png",
     "Pupper/assets/Upper_Leg_0.obj",
     "Pupper/assets/Upper_Leg_1.obj",

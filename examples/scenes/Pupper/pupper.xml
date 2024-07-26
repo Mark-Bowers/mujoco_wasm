@@ -6,10 +6,12 @@
     <texture name="grid" type="2d" builtin="checker" width="512" height="512" rgb1=".2 .4 .6" rgb2=".4 .6 .8"/>
     <material name="grid" texture="grid" texrepeat="1 1" texuniform="true" reflectance="0"/>
 
-    <texture type="2d"  file="Slate.png"/>
     <!-- <texture type="2d"  file="Concrete.png"/> -->
-    <material name="Slate"    texture="Slate"     specular="0.0" shininess="0.0" reflectance="0.1" texrepeat="4 3"/>
+    <texture type="2d"  file="Oak.png"/>
+    <texture type="2d"  file="Slate.png"/>
     <!-- <material name="Concrete" texture="Concrete"  specular="0.0" shininess="0.0" reflectance="0.1" texrepeat="1 1"/> -->
+    <material name="Oak"      texture="Oak"       specular="0.0" shininess="0.0" reflectance="0.1" texrepeat="4 4"/>
+    <material name="Slate"    texture="Slate"     specular="0.0" shininess="0.0" reflectance="0.1" texrepeat="4 3"/>
 
     <material name="ABS_(LightMagenta)"     specular="0.5" shininess="0.5" rgba="1.000000 0.521569 1.000000 1.0"/>
     <material name="ABS_(DodgerBlue)"       specular="0.5" shininess="0.5" rgba="0.000000 0.588235 1.000000 1.0"/>
@@ -110,7 +112,8 @@
 
   <worldbody>
     <!-- Environment -->
-    <geom class="floor" size="0 0 .004" material="Slate"/>
+    <!-- <geom class="floor" size="0 0 .004" material="Slate"/> -->
+    <geom class="floor" size="2 2 .004" material="Oak"/>
     <light name="spotlight" mode="targetbodycom" target="base_link" pos="0 -4 4" diffuse="0.9 0.9 0.9" specular="0.3 0.3 0.3" cutoff="100" castshadow="false"/>
     <light pos="1 -1 1.5" dir="-1 1 -1" diffuse="0.5 0.5 0.5" directional="true"/>
     <camera name="tracking_cam" mode="targetbody" target="base_link" pos="0.5 -0.5 0.5"/>
