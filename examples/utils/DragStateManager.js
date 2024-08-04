@@ -86,7 +86,7 @@ export class DragStateManager {
         let intersects = this.raycaster.intersectObjects(this.scene.children);
         for (let i = 0; i < intersects.length; i++) {
             let obj = intersects[i].object;
-            if (obj.bodyID && obj.bodyID > 0) {
+            if (obj.bodyId && obj.bodyId > 0) {
                 this.physicsObject = obj;
                 this.grabDistance = intersects[0].distance;
                 let hit = this.raycaster.ray.origin.clone();

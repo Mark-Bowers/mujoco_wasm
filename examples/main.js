@@ -114,7 +114,7 @@ export class MuJoCoDemo {
         // Clear old perturbations, apply new ones.
         for (let i = 0; i < this.simulation.qfrc_applied.length; i++) { this.simulation.qfrc_applied[i] = 0.0; }
         let dragged = this.dragStateManager.physicsObject;
-        if (dragged && dragged.bodyID) {
+        if (dragged && dragged.bodyId) {
           for (let b = 0; b < this.model.nbody; b++) {
             if (this.bodies[b]) {
               getPosition  (this.simulation.xpos , b, this.bodies[b].position);
@@ -122,11 +122,11 @@ export class MuJoCoDemo {
               this.bodies[b].updateWorldMatrix();
             }
           }
-          let bodyID = dragged.bodyID;
+          let bodyId = dragged.bodyId;
           this.dragStateManager.update(); // Update the world-space force origin
-          let force = toMujocoPos(this.dragStateManager.currentWorld.clone().sub(this.dragStateManager.worldHit).multiplyScalar(this.model.body_mass[bodyID] * 250));
+          let force = toMujocoPos(this.dragStateManager.currentWorld.clone().sub(this.dragStateManager.worldHit).multiplyScalar(this.model.body_mass[bodyId] * 250));
           let point = toMujocoPos(this.dragStateManager.worldHit.clone());
-          this.simulation.applyForce(force.x, force.y, force.z, 0, 0, 0, point.x, point.y, point.z, bodyID);
+          this.simulation.applyForce(force.x, force.y, force.z, 0, 0, 0, point.x, point.y, point.z, bodyId);
 
           // TODO: Apply pose perturbations (mocap bodies only).
         }
@@ -139,8 +139,8 @@ export class MuJoCoDemo {
     } else if (this.params["paused"]) {
       this.dragStateManager.update(); // Update the world-space force origin
       let dragged = this.dragStateManager.physicsObject;
-      if (dragged && dragged.bodyID) {
-        let b = dragged.bodyID;
+      if (dragged && dragged.bodyId) {
+        let b = dragged.bodyId;
         getPosition  (this.simulation.xpos , b, this.tmpVec , false); // Get raw coordinate from MuJoCo
         getQuaternion(this.simulation.xquat, b, this.tmpQuat, false); // Get raw coordinate from MuJoCo
 

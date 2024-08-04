@@ -373,7 +373,7 @@ function getGeometry(mujoco, model, geomId, body) {
   } else if (type == mujoco.mjtGeom.mjGEOM_CAPSULE.value) {
     geometry = new THREE.CapsuleGeometry(size[0], size[1] * 2.0, 20, 20);
   } else if (type == mujoco.mjtGeom.mjGEOM_ELLIPSOID.value) {
-    geometry = new THREE.SphereGeometry(1); // Stretch this below
+    geometry = new THREE.SphereGeometry(1);     // Stretch a sphere into an ellipsoid
     geometry.scale(size[0], size[2], size[1]);
   } else if (type == mujoco.mjtGeom.mjGEOM_CYLINDER.value) {
     geometry = new THREE.CylinderGeometry(size[0], size[0], size[1] * 2.0);
@@ -495,6 +495,37 @@ function getMaterial(model, g, materials, textures) {
   return material;
 }
 
+function createMesh(mujoco, model, g, geometry, material, body) {
+  let mesh = undefined;
+
+  const geom_type = model.geom_type[g];
+  if (geom_type == mujoco.mjtGeom.mjGEOM_PLANE.value) {
+    mesh = new Reflector( geometry, {
+      color: material.color,
+      clipBias: 0.003,
+      texture: material.map,
+      reflectivity: material.reflectivity
+    });
+    mesh.rotateX( - Math.PI / 2 );
+
+    mesh.castShadow = false;                  // The (floor) plane recieves shadows, but does not cast them
+    mesh.receiveShadow = true;
+  } else {
+    mesh = new THREE.Mesh(geometry, material);
+
+    mesh.castShadow = true;                   // Meshes, other than plane, cast shadows
+    mesh.receiveShadow = geom_type != 7;      // Set mesh to not recieve shadow
+
+    getQuaternion(model.geom_quat, g, mesh.quaternion);
+  }
+  getPosition( model.geom_pos, g, mesh.position );
+
+  mesh.bodyId = body.bodyId;  // Used to identify body for selection and dragging
+  body.add(mesh);             // Add mesh to body
+
+  return mesh;
+}
+
 /** Loads a scene for MuJoCo
  * @param {mujoco} mujoco This is a reference to the mujoco namespace object
  * @param {string} filename This is the name of the .xml file in the /working/ directory of the MuJoCo/Emscripten Virtual File System
@@ -533,10 +564,6 @@ export async function loadSceneFromURL(mujoco, filename, parent) {
     /** @type {THREE.Light[]} */
     let lights = [];
 
-    // Default material definition.
-    let material = new THREE.MeshPhysicalMaterial();
-    material.color = new THREE.Color(1, 1, 1);
-
     // Create an array of THREE.DataTexture to hold objects from the textures specified in the MuJoCo model
     let textures = new Array(model.ntex);
 
@@ -545,8 +572,10 @@ export async function loadSceneFromURL(mujoco, filename, parent) {
 
     // Loop through the MuJoCo geoms and recreate them in three.js
     for (let g = 0; g < model.ngeom; g++) {
-      // Only visualize geom groups up to 2 (same default behavior as simulate).
-      if (!(model.geom_group[g] < 3)) { continue; }
+      const geom_group = model.geom_group[g];
+
+      // Only visualize geom groups up to 2 (same default behavior as simulate)
+      if (geom_group > 2) { continue; }
 
       // Get the body ID and type of the geom.
       let b = model.geom_bodyid[g];
@@ -555,33 +584,20 @@ export async function loadSceneFromURL(mujoco, filename, parent) {
       if (!(b in bodies)) {
         bodies[b] = new THREE.Group();
         bodies[b].name = names[model.name_bodyadr[b]];
-        bodies[b].bodyID = b;
+        bodies[b].bodyId = b;
         bodies[b].has_custom_mesh = false;
       }
 
+      const body = bodies[b];
+
       // Get the the three.js geometry for the MuJoCo geom
-      const geometry = getGeometry(mujoco, model, g, bodies[b]);
+      const geometry = getGeometry(mujoco, model, g, body);
 
       // Get material for geom
       const material = getMaterial(model, g, materials, textures);
 
-      let mesh = new THREE.Mesh();
-      const type = model.geom_type[g];
-      if (type == 0) {
-        mesh = new Reflector( geometry, { clipBias: 0.003, texture: material.map } );
-        mesh.rotateX( - Math.PI / 2 );
-      } else {
-        mesh = new THREE.Mesh(geometry, material);
-      }
-
-      mesh.castShadow = g == 0 ? false : true;
-      mesh.receiveShadow = type != 7;
-      mesh.bodyID = b;
-      bodies[b].add(mesh);
-      getPosition  (model.geom_pos, g, mesh.position  );
-      if (type != 0) { getQuaternion(model.geom_quat, g, mesh.quaternion); }
-      const size = subarray(model.geom_size, g, 3);
-      if (type == 4) { mesh.scale.set(size[0], size[2], size[1]) } // Stretch the Ellipsoid
+      // Create mesh from geometry
+      createMesh(mujoco, model, g, geometry, material, body);
     }
 
     // Parse tendons.
@@ -637,7 +653,7 @@ export async function loadSceneFromURL(mujoco, filename, parent) {
         bodies[0].add(bodies[b]);
       } else {
         console.log("Body without Geometry detected; adding to bodies", b, bodies[b]);
-        bodies[b] = new THREE.Group(); bodies[b].name = names[b + 1]; bodies[b].bodyID = b; bodies[b].has_custom_mesh = false;
+        bodies[b] = new THREE.Group(); bodies[b].name = names[b + 1]; bodies[b].bodyId = b; bodies[b].has_custom_mesh = false;
         bodies[0].add(bodies[b]);
       }
     }
