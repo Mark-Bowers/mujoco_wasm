@@ -263,6 +263,37 @@ export function setupGUI(parentContext) {
 }
 
 
+// Create a global TextDecoder instance
+const textDecoder = new TextDecoder("utf-8");
+
+// Function that decodes a portion of a typed array up to the first null character
+function decodeName(model, index) {
+    const name_arr = model.names.subarray(index);
+    const end = name_arr.indexOf(0);    // Decode to NUL terminator
+    return textDecoder.decode(name_arr.subarray(0, end));
+}
+
+function textureName(model, texId) {
+  return decodeName(model, model.name_texadr[texId]);
+}
+
+function materialName(model, matId) {
+  return decodeName(model, model.name_matadr[matId]);
+}
+
+// Function to convert a floating point number in the range [0 1] to a two-digit hexadecimal string
+const norm2hex = (c) => {
+  const hex = Math.round(c * 255).toString(16);
+  return hex.length === 1 ? '0' + hex : hex;
+};
+
+// Convert an rgba array to a hex string representation of the color
+function rgba2name(rgba) {
+  let name = "#";
+  for (const c of rgba) { name += norm2hex(c); };
+  return name;
+}
+
 // subarray helper function (computes start and end and returns subarray)
 function subarray(array, index, size, num = 1) {
   const start = index * size;
@@ -358,6 +389,112 @@ function getGeometry(mujoco, model, geomId, body) {
   return geometry;
 }
 
+function createTexture(model, texId, textures) {
+  const type    = model.tex_type[texId];    // 2d:0, cube:1, skybox:2
+  const width   = model.tex_width[texId];
+  const height  = model.tex_height[texId];
+  const offset  = model.tex_adr[texId];
+  const rgb     = model.tex_rgb;
+
+  // Create a THREE.RGBAFormat texture format array from MuJoCo RGB texture
+  const len = width * height * 4;
+  let rgba = new Uint8Array(len);
+  for (let p1 = 0, p2 = offset; p1 < len;){
+    rgba[p1++] = rgb[p2++];
+    rgba[p1++] = rgb[p2++];
+    rgba[p1++] = rgb[p2++];
+    rgba[p1++] = 1.0;
+  }
+  let texture = new THREE.DataTexture(rgba, width, height)
+  texture.name = textureName(model, texId);
+  texture.mtype = type;         // MuJoCo type // TODO: Is this necessary/useful?
+  texture.needsUpdate = true;
+
+  textures[texId] =  texture;   // Add this texture to set of textures
+
+  return texture;
+}
+
+// Create a material properties object with core properties
+function createMatProperties(name, red, green, blue, alpha) {
+  return {
+    name        : name,
+    color       : new THREE.Color(red, green, blue),
+    transparent : alpha < 1.0,
+    opacity     : alpha
+  };
+}
+
+function createMaterial(model, matId, textures) {
+  // TODO: Get the appearance as close as possible to MuJoCo viewer
+
+  // MeshStandardMaterial
+  const name = materialName(model, matId);
+  const rgba = subarray(model.mat_rgba, matId, 4);
+  let matProperties = createMatProperties(name, ...rgba);
+
+  const roughness =   1.0 - model.mat_shininess[matId];
+  // const metalness         = model.mat_specular[matId];
+  const metalness         = 0.1;
+
+  matProperties.roughness = roughness;
+  matProperties.metalness = metalness;
+
+  // MeshPhysicalMaterial
+  const reflectivity      = model.mat_reflectance[matId];
+  const specularIntensity = model.mat_specular[matId] * 0.5;
+
+  matProperties.reflectivity  = reflectivity;
+  matProperties.specularIntensity = specularIntensity
+  // matProperties.clearcoat= reflectivity;
+  // matProperties.clearcoatRoughness= roughness;
+
+  const texId = model.mat_texid[matId];
+  if (texId != -1) {              // material specifies a texture
+    let texture = textures[texId];
+    if (texture == undefined) {
+      texture = createTexture(model, texId, textures);
+    }
+    const mat_texrepeat = subarray(model.mat_texrepeat, matId, 2)
+    const set_repeat = mat_texrepeat[0] != texture.repeat.x || mat_texrepeat[1] != texture.repeat.x;
+    if (set_repeat) {             // Set texture.repeat to match mat_texrepeat
+      if (texture.repeat.x != 1 || texture.repeat.y != 1) {
+        // TODO: Need to copy texture object and set texrepeat
+      }
+      texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+      texture.repeat.set(...mat_texrepeat);   // TODO: Test cube wrapping
+      texture.needsUpdate = true;
+    }
+    matProperties.map = texture;  // Assign the texture to the material
+  }
+
+  return new THREE.MeshPhysicalMaterial(matProperties);
+}
+
+function getMaterial(model, g, materials, textures) {
+  const matId = model.geom_matid[g];                  // geom material id
+
+  let material = undefined;
+
+  if (matId != -1) {                    // geom specifies a material
+    material = materials[matId];
+    if (material == undefined) {        // material has not been created yet
+      material = materials[matId] = createMaterial(model, matId, textures);
+    }
+  } else {                              // geom does not specify a material; use geom color
+    const geom_rgba = subarray(model.geom_rgba, g, 4);  // geom rgba color
+    const name = rgba2name(geom_rgba);  // Name the material based on its color
+    material = materials[name];         // Check if material already exists
+
+    if (!material) {                    // Need to create a new material
+      material = new THREE.MeshPhysicalMaterial(createMatProperties(name, ...geom_rgba));
+      materials[name] = material;       // Save the new material indexed by name
+    }
+  }
+
+  return material;
+}
+
 /** Loads a scene for MuJoCo
  * @param {mujoco} mujoco This is a reference to the mujoco namespace object
  * @param {string} filename This is the name of the .xml file in the /working/ directory of the MuJoCo/Emscripten Virtual File System
@@ -400,7 +537,13 @@ export async function loadSceneFromURL(mujoco, filename, parent) {
     let material = new THREE.MeshPhysicalMaterial();
     material.color = new THREE.Color(1, 1, 1);
 
-    // Loop through the MuJoCo geoms and recreate them in three.js.
+    // Create an array of THREE.DataTexture to hold objects from the textures specified in the MuJoCo model
+    let textures = new Array(model.ntex);
+
+    // Create an array of THREE material to hold objects from the materials specified in the MuJoCo model
+    let materials = new Array(model.nmat);
+
+    // Loop through the MuJoCo geoms and recreate them in three.js
     for (let g = 0; g < model.ngeom; g++) {
       // Only visualize geom groups up to 2 (same default behavior as simulate).
       if (!(model.geom_group[g] < 3)) { continue; }
@@ -419,58 +562,13 @@ export async function loadSceneFromURL(mujoco, filename, parent) {
       // Get the the three.js geometry for the MuJoCo geom
       const geometry = getGeometry(mujoco, model, g, bodies[b]);
 
-      // Set the Material Properties of incoming bodies
-      let texture = undefined;
-      let color = subarray(model.geom_rgba, g, 4);
-      let matId = model.geom_matid[g];
-
-      if (model.geom_matid[g] != -1) {
-        color = subarray(model.mat_rgba, matId, 4);
-
-        // Construct Texture from model.tex_rgb
-        texture = undefined;
-        let texId = model.mat_texid[matId];
-        if (texId != -1) {
-          let width    = model.tex_width [texId];
-          let height   = model.tex_height[texId];
-          let offset   = model.tex_adr   [texId];
-          let rgbArray = model.tex_rgb   ;
-          let rgbaArray = new Uint8Array(width * height * 4);
-          for (let p = 0; p < width * height; p++){
-            rgbaArray[(p * 4) + 0] = rgbArray[offset + ((p * 3) + 0)];
-            rgbaArray[(p * 4) + 1] = rgbArray[offset + ((p * 3) + 1)];
-            rgbaArray[(p * 4) + 2] = rgbArray[offset + ((p * 3) + 2)];
-            rgbaArray[(p * 4) + 3] = 1.0;
-          }
-          texture = new THREE.DataTexture(rgbaArray, width, height, THREE.RGBAFormat, THREE.UnsignedByteType
-             , THREE.UVMapping, THREE.RepeatWrapping, THREE.RepeatWrapping);
-          let mat_texrepeat = subarray(model.mat_texrepeat, matId, 2)
-          texture.repeat = new THREE.Vector2(...mat_texrepeat);
-          texture.needsUpdate = true;
-        }
-      }
-
-      if (material.color.r != color[0] ||
-          material.color.g != color[1] ||
-          material.color.b != color[2] ||
-          material.opacity != color[3] ||
-          material.map     != texture) {
-        material = new THREE.MeshPhysicalMaterial({
-          color: new THREE.Color(color[0], color[1], color[2]),
-          transparent: color[3] < 1.0,
-          opacity: color[3],
-          specularIntensity: matId == -1 ? undefined :       model.mat_specular[matId] * 0.5,
-          reflectivity     : matId == -1 ? undefined :       model.mat_reflectance[matId],
-          roughness        : matId == -1 ? undefined : 1.0 - model.mat_shininess[matId],
-          metalness        : matId == -1 ? undefined : 0.1,
-          map              : texture
-        });
-      }
+      // Get material for geom
+      const material = getMaterial(model, g, materials, textures);
 
       let mesh = new THREE.Mesh();
       const type = model.geom_type[g];
       if (type == 0) {
-        mesh = new Reflector( geometry, { clipBias: 0.003, texture: texture } );
+        mesh = new Reflector( geometry, { clipBias: 0.003, texture: material.map } );
         mesh.rotateX( - Math.PI / 2 );
       } else {
         mesh = new THREE.Mesh(geometry, material);
