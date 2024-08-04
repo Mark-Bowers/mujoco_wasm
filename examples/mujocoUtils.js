@@ -307,6 +307,57 @@ function createBufferGeometry(model, meshId, body) {
   return geometry
 }
 
+const getBufferGeometry = (function() {
+  /** @type {Object.<number, THREE.BufferGeometry>} */
+  let meshes = {};
+
+  return function(model, meshId, body) {
+    let geometry = undefined;
+
+    if (meshId in meshes) {
+      geometry = meshes[meshId];
+    } else {
+      geometry = meshes[meshId] = createBufferGeometry(model, meshId, body);
+    }
+
+    return geometry;
+  };
+})();
+
+function getGeometry(mujoco, model, geomId, body) {
+  const type = model.geom_type[geomId];
+  const size = subarray(model.geom_size, geomId, 3);
+
+  let geometry = undefined;
+
+  if (type == mujoco.mjtGeom.mjGEOM_PLANE.value) {
+    // TODO: 0 values should be set to the far clipping plane rather than 100
+    const x = size[0] == 0 ? 100 : size[0] * 2;
+    const y = size[1] == 0 ? 100 : size[1] * 2;
+    geometry = new THREE.PlaneGeometry(x, y);
+  } else if (type == mujoco.mjtGeom.mjGEOM_HFIELD.value) {
+    // TODO: Implement height field.
+  } else if (type == mujoco.mjtGeom.mjGEOM_SPHERE.value) {
+    geometry = new THREE.SphereGeometry(size[0]);
+  } else if (type == mujoco.mjtGeom.mjGEOM_CAPSULE.value) {
+    geometry = new THREE.CapsuleGeometry(size[0], size[1] * 2.0, 20, 20);
+  } else if (type == mujoco.mjtGeom.mjGEOM_ELLIPSOID.value) {
+    geometry = new THREE.SphereGeometry(1); // Stretch this below
+    geometry.scale(size[0], size[2], size[1]);
+  } else if (type == mujoco.mjtGeom.mjGEOM_CYLINDER.value) {
+    geometry = new THREE.CylinderGeometry(size[0], size[0], size[1] * 2.0);
+  } else if (type == mujoco.mjtGeom.mjGEOM_BOX.value) {
+    geometry = new THREE.BoxGeometry(size[0] * 2.0, size[2] * 2.0, size[1] * 2.0);
+  } else if (type == mujoco.mjtGeom.mjGEOM_MESH.value) {
+    const meshId = model.geom_dataid[geomId];
+    geometry = getBufferGeometry(model, meshId, body);
+  } else {    // Set the default geometry. In MuJoCo, this is a sphere.
+    geometry = new THREE.SphereGeometry(size[0] * 0.5);
+  }
+
+  return geometry;
+}
+
 /** Loads a scene for MuJoCo
  * @param {mujoco} mujoco This is a reference to the mujoco namespace object
  * @param {string} filename This is the name of the .xml file in the /working/ directory of the MuJoCo/Emscripten Virtual File System
@@ -342,8 +393,6 @@ export async function loadSceneFromURL(mujoco, filename, parent) {
 
     /** @type {Object.<number, THREE.Group>} */
     let bodies = {};
-    /** @type {Object.<number, THREE.BufferGeometry>} */
-    let meshes = {};
     /** @type {THREE.Light[]} */
     let lights = [];
 
@@ -358,8 +407,6 @@ export async function loadSceneFromURL(mujoco, filename, parent) {
 
       // Get the body ID and type of the geom.
       let b = model.geom_bodyid[g];
-      let type = model.geom_type[g];
-      let size = subarray(model.geom_size, g, 3)
 
       // Create the body if it doesn't exist.
       if (!(b in bodies)) {
@@ -369,33 +416,8 @@ export async function loadSceneFromURL(mujoco, filename, parent) {
         bodies[b].has_custom_mesh = false;
       }
 
-      // Set the default geometry. In MuJoCo, this is a sphere.
-      let geometry = new THREE.SphereGeometry(size[0] * 0.5);
-      if (type == mujoco.mjtGeom.mjGEOM_PLANE.value) {
-        // Special handling for plane later.
-      } else if (type == mujoco.mjtGeom.mjGEOM_HFIELD.value) {
-        // TODO: Implement this.
-      } else if (type == mujoco.mjtGeom.mjGEOM_SPHERE.value) {
-        geometry = new THREE.SphereGeometry(size[0]);
-      } else if (type == mujoco.mjtGeom.mjGEOM_CAPSULE.value) {
-        geometry = new THREE.CapsuleGeometry(size[0], size[1] * 2.0, 20, 20);
-      } else if (type == mujoco.mjtGeom.mjGEOM_ELLIPSOID.value) {
-        geometry = new THREE.SphereGeometry(1); // Stretch this below
-      } else if (type == mujoco.mjtGeom.mjGEOM_CYLINDER.value) {
-        geometry = new THREE.CylinderGeometry(size[0], size[0], size[1] * 2.0);
-      } else if (type == mujoco.mjtGeom.mjGEOM_BOX.value) {
-        geometry = new THREE.BoxGeometry(size[0] * 2.0, size[2] * 2.0, size[1] * 2.0);
-      } else if (type == mujoco.mjtGeom.mjGEOM_MESH.value) {
-        let meshID = model.geom_dataid[g];
-
-        if (!(meshID in meshes)) {
-          geometry = createBufferGeometry(model, meshID, bodies[b]);
-          meshes[meshID] = geometry;
-        } else {
-          geometry = meshes[meshID];
-        }
-      }
-      // Done with geometry creation.
+      // Get the the three.js geometry for the MuJoCo geom
+      const geometry = getGeometry(mujoco, model, g, bodies[b]);
 
       // Set the Material Properties of incoming bodies
       let texture = undefined;
@@ -446,11 +468,9 @@ export async function loadSceneFromURL(mujoco, filename, parent) {
       }
 
       let mesh = new THREE.Mesh();
+      const type = model.geom_type[g];
       if (type == 0) {
-        // 0 values should be set to the far clipping plane rather than 100
-        let x = size[0] == 0 ? 100 : size[0] * 2;
-        let y = size[1] == 0 ? 100 : size[1] * 2;
-        mesh = new Reflector( new THREE.PlaneGeometry( x, y ), { clipBias: 0.003, texture: texture } );
+        mesh = new Reflector( geometry, { clipBias: 0.003, texture: texture } );
         mesh.rotateX( - Math.PI / 2 );
       } else {
         mesh = new THREE.Mesh(geometry, material);
@@ -462,6 +482,7 @@ export async function loadSceneFromURL(mujoco, filename, parent) {
       bodies[b].add(mesh);
       getPosition  (model.geom_pos, g, mesh.position  );
       if (type != 0) { getQuaternion(model.geom_quat, g, mesh.quaternion); }
+      const size = subarray(model.geom_size, g, 3);
       if (type == 4) { mesh.scale.set(size[0], size[2], size[1]) } // Stretch the Ellipsoid
     }
 
