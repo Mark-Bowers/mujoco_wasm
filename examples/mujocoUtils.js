@@ -263,44 +263,47 @@ export function setupGUI(parentContext) {
 }
 
 
-function subarray(array, index, size) {
-  let offset = index * size;
-  return array.subarray(offset, offset + size);
+// subarray helper function (computes start and end and returns subarray)
+function subarray(array, index, size, num = 1) {
+  const start = index * size;
+  const end = start + size * num;
+  return array.subarray(start, end);
 }
 
-function createNewBufferGeometry(model, meshID) {
+// Swizzles (permute) each point in an array of xyz coordinates (z->y, -y->z)
+function swizzlePointArray(points) { // model.mesh_vert, model.mesh_vertadr[meshId], 3, model.mesh_vertnum[meshId]
+  for (let v = 0; v < points.length; v+=3) {
+    //points[v + 0] =  points[v + 0];   // x (no change)
+    const y       =  points[v + 1];     // save y value
+    points[v + 1] =  points[v + 2];     // move z value to y
+    points[v + 2] = -y;                 // use saved y value to move -y to z
+  }
+}
+
+// Create a new THREE.BufferGeometry from the corresponding MuJoCo mesh
+function createBufferGeometry(model, meshId, body) {
   let geometry = new THREE.BufferGeometry();
 
-  let vertex_buffer = model.mesh_vert.subarray(
-     model.mesh_vertadr[meshID] * 3,
-    (model.mesh_vertadr[meshID]  + model.mesh_vertnum[meshID]) * 3);
-  for (let v = 0; v < vertex_buffer.length; v+=3){
-    //vertex_buffer[v + 0] =  vertex_buffer[v + 0];
-    let temp             =  vertex_buffer[v + 1];
-    vertex_buffer[v + 1] =  vertex_buffer[v + 2];
-    vertex_buffer[v + 2] = -temp;
-  }
+  const vert_index = model.mesh_vertadr[meshId];
+  const num_vertices = model.mesh_vertnum[meshId];
 
-  let normal_buffer = model.mesh_normal.subarray(
-     model.mesh_vertadr[meshID] * 3,
-    (model.mesh_vertadr[meshID]  + model.mesh_vertnum[meshID]) * 3);
-  for (let v = 0; v < normal_buffer.length; v+=3){
-    //normal_buffer[v + 0] =  normal_buffer[v + 0];
-    let temp             =  normal_buffer[v + 1];
-    normal_buffer[v + 1] =  normal_buffer[v + 2];
-    normal_buffer[v + 2] = -temp;
-  }
+  // TODO: Since these arrays are swizzled in place, make sure it only happens once.
+  let vertex_buffer = subarray(model.mesh_vert, vert_index, 3, num_vertices);
+  swizzlePointArray(vertex_buffer);
 
-  let uv_buffer = model.mesh_texcoord.subarray(
-     model.mesh_texcoordadr[meshID] * 2,
-    (model.mesh_texcoordadr[meshID]  + model.mesh_vertnum[meshID]) * 2);
-  let triangle_buffer = model.mesh_face.subarray(
-     model.mesh_faceadr[meshID] * 3,
-    (model.mesh_faceadr[meshID]  + model.mesh_facenum[meshID]) * 3);
+  let normal_buffer = subarray(model.mesh_normal, vert_index, 3, num_vertices);
+  swizzlePointArray(normal_buffer);
+
+  const uv_buffer = subarray(model.mesh_texcoord, model.mesh_texcoordadr[meshId], 2, num_vertices);
+  const triangle_buffer = subarray(model.mesh_face, model.mesh_faceadr[meshId], 3, model.mesh_facenum[meshId]);
+
   geometry.setAttribute("position", new THREE.BufferAttribute(vertex_buffer, 3));
   geometry.setAttribute("normal"  , new THREE.BufferAttribute(normal_buffer, 3));
   geometry.setAttribute("uv"      , new THREE.BufferAttribute(    uv_buffer, 2));
   geometry.setIndex    (Array.from(triangle_buffer));
+
+  body.has_custom_mesh = true;
+
   return geometry
 }
 
@@ -386,13 +389,11 @@ export async function loadSceneFromURL(mujoco, filename, parent) {
         let meshID = model.geom_dataid[g];
 
         if (!(meshID in meshes)) {
-          geometry = createNewBufferGeometry(model, meshID);
+          geometry = createBufferGeometry(model, meshID, bodies[b]);
           meshes[meshID] = geometry;
         } else {
           geometry = meshes[meshID];
         }
-
-        bodies[b].has_custom_mesh = true;
       }
       // Done with geometry creation.
 
