@@ -1,6 +1,44 @@
 import * as THREE from 'three';
 import { Vector3 } from 'three';
 
+THREE.Mesh.prototype.setHighlightState = (function() {
+    const highlightColor = 0xff0000;
+    let selectedMesh = null;
+
+    function highlight(mesh) {
+        // If another mesh was previously selected, unhighlight it first
+        if (selectedMesh) {
+            unhighlight(selectedMesh);
+        }
+
+        // Create a clone of the material and set the emmisive highlight color
+        const highlightedMaterial = mesh.material.clone();
+        highlightedMaterial.emissive.setHex(highlightColor);
+
+        // Save the original material and apply the highlighted material to this mesh
+        mesh._originalMaterial = mesh.material;
+        mesh.material = highlightedMaterial;
+
+        selectedMesh = mesh;
+    }
+
+    function unhighlight(mesh) {
+        mesh.material.dispose();  // Dispose the current highlighted material to free memory
+        mesh.material = mesh._originalMaterial; // Restore the original material
+
+        selectedMesh = null;
+    }
+
+    return function() {
+        // Check if the mesh is being unhighlighted or highlighted
+        if (this === selectedMesh) {
+            unhighlight(this);
+        } else {
+            highlight(this);
+        }
+    };
+})();
+
 export class DragStateManager {
     constructor(scene, renderer, camera, container, controls) {
         this.scene = scene;
@@ -25,9 +63,6 @@ export class DragStateManager {
         this.arrow.line.material.opacity = 0.5;
         this.arrow.cone.material.opacity = 0.5;
         this.arrow.visible = false;
-
-        this.previouslySelected = null;
-        this.higlightColor = 0xff0000;  // 0x777777
 
         this.localHit = new Vector3();
         this.worldHit = new Vector3();
@@ -114,21 +149,7 @@ export class DragStateManager {
             this.start(evt.clientX, evt.clientY);
             this.doubleClick = true;
             if (this.physicsObject) {
-                if (this.physicsObject == this.previouslySelected) {
-                    this.physicsObject.material.emissive.setHex(0x000000);
-                    this.previouslySelected = null;
-                } else {
-                    if (this.previouslySelected) {
-                        this.previouslySelected.material.emissive.setHex(0x000000);
-                    }
-                    this.physicsObject.material.emissive.setHex(this.higlightColor);
-                    this.previouslySelected = this.physicsObject;
-                }
-            } else {
-                if (this.previouslySelected) {
-                    this.previouslySelected.material.emissive.setHex(0x000000);
-                    this.previouslySelected = null;
-                }
+                this.physicsObject.setHighlightState();
             }
         }
     }
