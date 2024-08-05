@@ -116,11 +116,9 @@ export class MuJoCoDemo {
         let dragged = this.dragStateManager.physicsObject;
         if (dragged && dragged.bodyId) {
           for (const [b, body] of Object.entries(this.bodies)) {
-            if (body) {
-              getPosition  (this.simulation.xpos , b, body.position);
-              getQuaternion(this.simulation.xquat, b, body.quaternion);
-              body.updateWorldMatrix();
-            }
+            getPosition  (this.simulation.xpos , b, body.position);
+            getQuaternion(this.simulation.xquat, b, body.quaternion);
+            body.updateWorldMatrix();
           }
           let bodyId = dragged.bodyId;
           this.dragStateManager.update(); // Update the world-space force origin
@@ -202,11 +200,9 @@ export class MuJoCoDemo {
 
     // Update body transforms.
     for (const [b, body] of Object.entries(this.bodies)) {
-      if (body) {
-        getPosition  (this.simulation.xpos , b, body.position);
-        getQuaternion(this.simulation.xquat, b, body.quaternion);
-        body.updateWorldMatrix();
-      }
+      getPosition  (this.simulation.xpos , b, body.position);
+      getQuaternion(this.simulation.xquat, b, body.quaternion);
+      body.updateWorldMatrix();
     }
 
     // Update light transforms.

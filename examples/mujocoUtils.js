@@ -357,24 +357,19 @@ function createBufferGeometry(model, meshId, body) {
   return geometry
 }
 
-const getBufferGeometry = (function() {
-  /** @type {Object.<number, THREE.BufferGeometry>} */
-  let meshes = {};
+function getBufferGeometry(model, meshId, body, meshes) {
+  let geometry = undefined;
 
-  return function(model, meshId, body) {
-    let geometry = undefined;
+  if (meshId in meshes) {
+    geometry = meshes[meshId];
+  } else {
+    geometry = meshes[meshId] = createBufferGeometry(model, meshId, body);
+  }
 
-    if (meshId in meshes) {
-      geometry = meshes[meshId];
-    } else {
-      geometry = meshes[meshId] = createBufferGeometry(model, meshId, body);
-    }
+  return geometry;
+}
 
-    return geometry;
-  };
-})();
-
-function getGeometry(mujoco, model, geomId, body) {
+function getGeometry(mujoco, model, geomId, body, meshes) {
   const type = model.geom_type[geomId];
   const size = subarray(model.geom_size, geomId, 3);
 
@@ -400,7 +395,7 @@ function getGeometry(mujoco, model, geomId, body) {
     geometry = new THREE.BoxGeometry(size[0] * 2.0, size[2] * 2.0, size[1] * 2.0);
   } else if (type == mujoco.mjtGeom.mjGEOM_MESH.value) {
     const meshId = model.geom_dataid[geomId];
-    geometry = getBufferGeometry(model, meshId, body);
+    geometry = getBufferGeometry(model, meshId, body, meshes);
   } else {    // Set the default geometry. In MuJoCo, this is a sphere.
     geometry = new THREE.SphereGeometry(size[0] * 0.5);
   }
@@ -472,7 +467,7 @@ function createMaterial(model, matId, textures) {
   const specularIntensity = model.mat_specular[matId] * 0.5;
 
   matProperties.reflectivity  = reflectivity;
-  matProperties.specularIntensity = specularIntensity
+  matProperties.specularIntensity = specularIntensity;
   // matProperties.clearcoat= reflectivity;
   // matProperties.clearcoatRoughness= roughness;
 
@@ -630,12 +625,15 @@ export async function loadSceneFromURL(mujoco, filename, parent) {
     let simulation = new mujoco.Simulation(model, state);
 
     // Create the root object.
-    let mujocoRoot = new THREE.Group();
+    const mujocoRoot = new THREE.Group();
     mujocoRoot.name = "MuJoCo Root"
     parent.scene.add(mujocoRoot);
 
     /** @type {Object.<number, THREE.Group>} */
     let bodies = {};
+
+    /** @type {Object.<number, THREE.BufferGeometry>} */
+    let meshes = {};
 
     // Create an array of THREE.DataTexture to hold objects from the textures specified in the MuJoCo model
     let textures = new Array(model.ntex);
@@ -654,7 +652,7 @@ export async function loadSceneFromURL(mujoco, filename, parent) {
       const body = getBody(model, g, bodies);
 
       // Get the the three.js geometry for the MuJoCo geom
-      const geometry = getGeometry(mujoco, model, g, body);
+      const geometry = getGeometry(mujoco, model, g, body, meshes);
 
       // Get material for geom
       const material = getMaterial(model, g, materials, textures);
@@ -681,7 +679,7 @@ export async function loadSceneFromURL(mujoco, filename, parent) {
         world.add(body);
       }
     }
-  
+
     parent.mujocoRoot = mujocoRoot;
 
     return [model, state, simulation, bodies, lights]
