@@ -115,11 +115,11 @@ export class MuJoCoDemo {
         for (let i = 0; i < this.simulation.qfrc_applied.length; i++) { this.simulation.qfrc_applied[i] = 0.0; }
         let dragged = this.dragStateManager.physicsObject;
         if (dragged && dragged.bodyId) {
-          for (let b = 0; b < this.model.nbody; b++) {
-            if (this.bodies[b]) {
-              getPosition  (this.simulation.xpos , b, this.bodies[b].position);
-              getQuaternion(this.simulation.xquat, b, this.bodies[b].quaternion);
-              this.bodies[b].updateWorldMatrix();
+          for (const [b, body] of Object.entries(this.bodies)) {
+            if (body) {
+              getPosition  (this.simulation.xpos , b, body.position);
+              getQuaternion(this.simulation.xquat, b, body.quaternion);
+              body.updateWorldMatrix();
             }
           }
           let bodyId = dragged.bodyId;
@@ -201,11 +201,11 @@ export class MuJoCoDemo {
     }
 
     // Update body transforms.
-    for (let b = 0; b < this.model.nbody; b++) {
-      if (this.bodies[b]) {
-        getPosition  (this.simulation.xpos , b, this.bodies[b].position);
-        getQuaternion(this.simulation.xquat, b, this.bodies[b].quaternion);
-        this.bodies[b].updateWorldMatrix();
+    for (const [b, body] of Object.entries(this.bodies)) {
+      if (body) {
+        getPosition  (this.simulation.xpos , b, body.position);
+        getQuaternion(this.simulation.xquat, b, body.quaternion);
+        body.updateWorldMatrix();
       }
     }
 

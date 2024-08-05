@@ -667,17 +667,18 @@ export async function loadSceneFromURL(mujoco, filename, parent) {
 
     const lights = createLights(model, mujocoRoot, bodies);
 
+    let world = bodies[0];
     for (let b = 0; b < model.nbody; b++) {
-      //let parent_body = model.body_parentid()[b];
-      if (b == 0 || !bodies[0]) {
-        mujocoRoot.add(bodies[b]);
-      } else if(bodies[b]){
-        bodies[0].add(bodies[b]);
+      let body = bodies[b];
+      if (b == 0 || !world) {
+        mujocoRoot.add(body);
+      } else if(body){
+        world.add(body);
       } else {
-        console.log("Body without Geometry detected; adding to bodies", b, bodies[b]);
         const name = bodyName(model, b);
-        bodies[b] = createBody(name, b, bodies);
-        bodies[0].add(bodies[b]);
+        console.log("Body without Geometry detected; adding to bodies", b, name);
+        body = createBody(name, b, bodies);
+        world.add(body);
       }
     }
   
