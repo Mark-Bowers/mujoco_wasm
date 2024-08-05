@@ -273,12 +273,32 @@ function decodeName(model, index) {
     return textDecoder.decode(name_arr.subarray(0, end));
 }
 
-function textureName(model, texId) {
-  return decodeName(model, model.name_texadr[texId]);
+function bodyName(model, bodyId) {
+  return decodeName(model, model.name_bodyadr[bodyId]);
 }
 
-function materialName(model, matId) {
-  return decodeName(model, model.name_matadr[matId]);
+function createBody(name, bodyId, bodies) {
+  let body = new THREE.Group();
+  body.name = name;
+  body.bodyId = bodyId;
+  body.has_custom_mesh = false;
+
+  bodies[bodyId] = body;  // Add this new body to set of bodies
+
+  return body;
+}
+
+function getBody(model, geomId, bodies) {
+  const b = model.geom_bodyid[geomId];
+  let body =  bodies[b];
+
+  // Create the body if it doesn't exist
+  if (body == undefined) {
+    const name = bodyName(model, b);
+    body = createBody(name, b, bodies);
+  }
+
+  return body;
 }
 
 // Function to convert a floating point number in the range [0 1] to a two-digit hexadecimal string
@@ -373,7 +393,7 @@ function getGeometry(mujoco, model, geomId, body) {
   } else if (type == mujoco.mjtGeom.mjGEOM_CAPSULE.value) {
     geometry = new THREE.CapsuleGeometry(size[0], size[1] * 2.0, 20, 20);
   } else if (type == mujoco.mjtGeom.mjGEOM_ELLIPSOID.value) {
-    geometry = new THREE.SphereGeometry(1);     // Stretch a sphere into an ellipsoid
+    geometry = new THREE.SphereGeometry(1); // Stretch a sphere into an ellipsoid
     geometry.scale(size[0], size[2], size[1]);
   } else if (type == mujoco.mjtGeom.mjGEOM_CYLINDER.value) {
     geometry = new THREE.CylinderGeometry(size[0], size[0], size[1] * 2.0);
@@ -387,6 +407,10 @@ function getGeometry(mujoco, model, geomId, body) {
   }
 
   return geometry;
+}
+
+function textureName(model, texId) {
+  return decodeName(model, model.name_texadr[texId]);
 }
 
 function createTexture(model, texId, textures) {
@@ -423,6 +447,10 @@ function createMatProperties(name, red, green, blue, alpha) {
     transparent : alpha < 1.0,
     opacity     : alpha
   };
+}
+
+function materialName(model, matId) {
+  return decodeName(model, model.name_matadr[matId]);
 }
 
 function createMaterial(model, matId, textures) {
@@ -577,18 +605,8 @@ export async function loadSceneFromURL(mujoco, filename, parent) {
       // Only visualize geom groups up to 2 (same default behavior as simulate)
       if (geom_group > 2) { continue; }
 
-      // Get the body ID and type of the geom.
-      let b = model.geom_bodyid[g];
-
-      // Create the body if it doesn't exist.
-      if (!(b in bodies)) {
-        bodies[b] = new THREE.Group();
-        bodies[b].name = names[model.name_bodyadr[b]];
-        bodies[b].bodyId = b;
-        bodies[b].has_custom_mesh = false;
-      }
-
-      const body = bodies[b];
+      // Get the parent body of the geom
+      const body = getBody(model, g, bodies);
 
       // Get the the three.js geometry for the MuJoCo geom
       const geometry = getGeometry(mujoco, model, g, body);
@@ -618,7 +636,7 @@ export async function loadSceneFromURL(mujoco, filename, parent) {
 
     // Parse lights.
     for (let l = 0; l < model.nlight; l++) {
-      let light = new THREE.SpotLight();
+      let light = undefined;
       if (model.light_directional[l]) {
         light = new THREE.DirectionalLight();
       } else {
