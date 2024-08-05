@@ -2,6 +2,16 @@ import * as THREE from 'three';
 import { Reflector  } from './utils/Reflector.js';
 import { MuJoCoDemo } from './main.js';
 
+const decodeName = (function() {
+  const textDecoder = new TextDecoder("utf-8");
+
+  return function(model, index) {
+    const name_arr = model.names.subarray(index);
+    const end = name_arr.indexOf(0);    // Decode to NUL terminator
+    return textDecoder.decode(name_arr.subarray(0, end));
+  };
+})();
+
 export async function reloadFunc() {
   // Delete the old scene and load the new scene
   this.scene.remove(this.scene.getObjectByName("MuJoCo Root"));
@@ -213,8 +223,9 @@ export function setupGUI(parentContext) {
   simulationFolder.add(parentContext.params, 'ctrlnoiserate', 0.0, 2.0, 0.01).name('Noise rate' );
   simulationFolder.add(parentContext.params, 'ctrlnoisestd' , 0.0, 2.0, 0.01).name('Noise scale');
 
-  let textDecoder = new TextDecoder("utf-8");
-  let nullChar    = textDecoder.decode(new ArrayBuffer(1));
+  function actuatorName(model, actuatorId) {
+    return decodeName(model, model.name_actuatoradr[actuatorId]);
+  }
 
   // Add actuator sliders.
   let actuatorFolder = simulationFolder.addFolder("Actuators");
@@ -223,9 +234,7 @@ export function setupGUI(parentContext) {
     let actuatorGUIs = [];
     for (let i = 0; i < model.nu; i++) {
       if (!model.actuator_ctrllimited[i]) { continue; }
-      let name = textDecoder.decode(
-        parentContext.model.names.subarray(
-          parentContext.model.name_actuatoradr[i])).split(nullChar)[0];
+      const name = actuatorName(parentContext.model, i);
 
       parentContext.params[name] = 0.0;
       let actuatorGUI = actuatorFolder.add(parentContext.params, name, act_range[2 * i], act_range[2 * i + 1], 0.01).name(name).listen();
@@ -262,16 +271,6 @@ export function setupGUI(parentContext) {
   parentContext.gui.open();
 }
 
-
-// Create a global TextDecoder instance
-const textDecoder = new TextDecoder("utf-8");
-
-// Function that decodes a portion of a typed array up to the first null character
-function decodeName(model, index) {
-    const name_arr = model.names.subarray(index);
-    const end = name_arr.indexOf(0);    // Decode to NUL terminator
-    return textDecoder.decode(name_arr.subarray(0, end));
-}
 
 function bodyName(model, bodyId) {
   return decodeName(model, model.name_bodyadr[bodyId]);
@@ -554,6 +553,63 @@ function createMesh(mujoco, model, g, geometry, material, body) {
   return mesh;
 }
 
+function createTendons(mujocoRoot) {
+  // Parse tendons.
+  let tendonMat = new THREE.MeshPhongMaterial();
+  tendonMat.color = new THREE.Color(0.8, 0.3, 0.3);
+
+  mujocoRoot.cylinders = new THREE.InstancedMesh(
+      new THREE.CylinderGeometry(1, 1, 1),
+      tendonMat, 1023);
+  mujocoRoot.cylinders.receiveShadow = true;
+  mujocoRoot.cylinders.castShadow    = true;
+  mujocoRoot.add(mujocoRoot.cylinders);
+
+  mujocoRoot.spheres = new THREE.InstancedMesh(
+      new THREE.SphereGeometry(1, 10, 10),
+      tendonMat, 1023);
+  mujocoRoot.spheres.receiveShadow = true;
+  mujocoRoot.spheres.castShadow    = true;
+  mujocoRoot.add(mujocoRoot.spheres);
+}
+
+function createLights(model, mujocoRoot, bodies) {
+  /** @type {THREE.Light[]} */
+  let lights = [];
+
+  for (let l = 0; l < model.nlight; l++) {
+    let light = undefined;
+    if (model.light_directional[l]) {
+      light = new THREE.DirectionalLight();
+    } else {
+      light = new THREE.SpotLight();
+    }
+    light.decay = model.light_attenuation[l] * 100;
+    light.penumbra = 0.5;
+    light.castShadow = true;            // default false
+
+    light.shadow.mapSize.width = 1024;  // default
+    light.shadow.mapSize.height = 1024; // default
+    light.shadow.camera.near = 1;       // default
+    light.shadow.camera.far = 10;       // default
+
+    //bodies[model.light_bodyid()].add(light);
+    if (bodies[0]) {
+      bodies[0].add(light);
+    } else {
+      mujocoRoot.add(light);
+    }
+    lights.push(light);
+  }
+
+  if (model.nlight == 0) {
+    let light = new THREE.DirectionalLight();
+    mujocoRoot.add(light);
+  }
+
+  return lights;
+}
+
 /** Loads a scene for MuJoCo
  * @param {mujoco} mujoco This is a reference to the mujoco namespace object
  * @param {string} filename This is the name of the .xml file in the /working/ directory of the MuJoCo/Emscripten Virtual File System
@@ -569,18 +625,9 @@ export async function loadSceneFromURL(mujoco, filename, parent) {
     }
 
     // Load in the state from XML.
-    parent.model       = mujoco.Model.load_from_xml("/working/"+filename);
-    parent.state       = new mujoco.State(parent.model);
-    parent.simulation  = new mujoco.Simulation(parent.model, parent.state);
-
-    let model = parent.model;
-    let state = parent.state;
-    let simulation = parent.simulation;
-
-    // Decode the null-terminated string names.
-    let textDecoder = new TextDecoder("utf-8");
-    let fullString = textDecoder.decode(model.names);
-    let names = fullString.split(textDecoder.decode(new ArrayBuffer(1)));
+    const model = mujoco.Model.load_from_xml("/working/"+filename);
+    let state = new mujoco.State(model);
+    let simulation = new mujoco.Simulation(model, state);
 
     // Create the root object.
     let mujocoRoot = new THREE.Group();
@@ -589,8 +636,6 @@ export async function loadSceneFromURL(mujoco, filename, parent) {
 
     /** @type {Object.<number, THREE.Group>} */
     let bodies = {};
-    /** @type {THREE.Light[]} */
-    let lights = [];
 
     // Create an array of THREE.DataTexture to hold objects from the textures specified in the MuJoCo model
     let textures = new Array(model.ntex);
@@ -618,50 +663,9 @@ export async function loadSceneFromURL(mujoco, filename, parent) {
       createMesh(mujoco, model, g, geometry, material, body);
     }
 
-    // Parse tendons.
-    let tendonMat = new THREE.MeshPhongMaterial();
-    tendonMat.color = new THREE.Color(0.8, 0.3, 0.3);
-    mujocoRoot.cylinders = new THREE.InstancedMesh(
-        new THREE.CylinderGeometry(1, 1, 1),
-        tendonMat, 1023);
-    mujocoRoot.cylinders.receiveShadow = true;
-    mujocoRoot.cylinders.castShadow    = true;
-    mujocoRoot.add(mujocoRoot.cylinders);
-    mujocoRoot.spheres = new THREE.InstancedMesh(
-        new THREE.SphereGeometry(1, 10, 10),
-        tendonMat, 1023);
-    mujocoRoot.spheres.receiveShadow = true;
-    mujocoRoot.spheres.castShadow    = true;
-    mujocoRoot.add(mujocoRoot.spheres);
+    createTendons(mujocoRoot);
 
-    // Parse lights.
-    for (let l = 0; l < model.nlight; l++) {
-      let light = undefined;
-      if (model.light_directional[l]) {
-        light = new THREE.DirectionalLight();
-      } else {
-        light = new THREE.SpotLight();
-      }
-      light.decay = model.light_attenuation[l] * 100;
-      light.penumbra = 0.5;
-      light.castShadow = true; // default false
-
-      light.shadow.mapSize.width = 1024; // default
-      light.shadow.mapSize.height = 1024; // default
-      light.shadow.camera.near = 1; // default
-      light.shadow.camera.far = 10; // default
-      //bodies[model.light_bodyid()].add(light);
-      if (bodies[0]) {
-        bodies[0].add(light);
-      } else {
-        mujocoRoot.add(light);
-      }
-      lights.push(light);
-    }
-    if (model.nlight == 0) {
-      let light = new THREE.DirectionalLight();
-      mujocoRoot.add(light);
-    }
+    const lights = createLights(model, mujocoRoot, bodies);
 
     for (let b = 0; b < model.nbody; b++) {
       //let parent_body = model.body_parentid()[b];
@@ -671,7 +675,8 @@ export async function loadSceneFromURL(mujoco, filename, parent) {
         bodies[0].add(bodies[b]);
       } else {
         console.log("Body without Geometry detected; adding to bodies", b, bodies[b]);
-        bodies[b] = new THREE.Group(); bodies[b].name = names[b + 1]; bodies[b].bodyId = b; bodies[b].has_custom_mesh = false;
+        const name = bodyName(model, b);
+        bodies[b] = createBody(name, b, bodies);
         bodies[0].add(bodies[b]);
       }
     }
