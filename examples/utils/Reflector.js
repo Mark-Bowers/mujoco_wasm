@@ -12,8 +12,12 @@ import {
 	HalfFloatType,
 	NoToneMapping,
 	LinearEncoding,
-    MeshPhysicalMaterial
+	MeshPhysicalMaterial,
+	DoubleSide
 } from 'three';
+
+// Now takes reflectivity [0 1] as a parameter
+// Modified to make the plane double-sided with the underside of the plane being semi-transparent (like MuJoCo)
 
 class Reflector extends Mesh {
 
@@ -34,7 +38,8 @@ class Reflector extends Mesh {
 		const clipBias = options.clipBias || 0;
 		const shader = options.shader || Reflector.ReflectorShader;
 		const multisample = ( options.multisample !== undefined ) ? options.multisample : 4;
-        const blendTexture = options.texture || undefined;
+		const blendTexture = options.texture || undefined;
+		const reflectivity = ( options.reflectivity != undefined ) ? options.reflectivity : 0.5;
 
 		//
 
@@ -55,39 +60,60 @@ class Reflector extends Mesh {
 
 		const renderTarget = new WebGLRenderTarget( textureWidth, textureHeight, { samples: multisample, type: HalfFloatType } );
 
-		this.material = new MeshPhysicalMaterial( { map: blendTexture });
-		this.material.uniforms = { tDiffuse     : { value: renderTarget.texture },
-								   textureMatrix: { value: textureMatrix        }};
-        this.material.onBeforeCompile = ( shader ) => {
+		this.material = new MeshPhysicalMaterial( { reflectivity: reflectivity } );
+		if (blendTexture) { this.material.map = blendTexture; }
+		this.material.side = DoubleSide;
 
+		this.material.uniforms = {
+			tDiffuse: { value: renderTarget.texture },
+			textureMatrix: { value: textureMatrix },
+			reflectivity: { value: reflectivity }
+		};
+
+		this.material.onBeforeCompile = ( shader ) => {
 			// Vertex Shader: Set Vertex Positions to the Unwrapped UV Positions
-            let bodyStart	= shader.vertexShader.indexOf( 'void main() {' );
+			let bodyStart = shader.vertexShader.indexOf( 'void main() {' );
 			shader.vertexShader =
-                shader.vertexShader.slice(0, bodyStart) +
-                '\nuniform mat4 textureMatrix;\nvarying vec4 vUv3;\n' +
-				shader.vertexShader.slice( bodyStart - 1, - 1 ) +
-				'	vUv3 = textureMatrix * vec4( position, 1.0 ); }';
+					shader.vertexShader.slice( 0, bodyStart ) +
+					'\nuniform mat4 textureMatrix;\nvarying vec4 vUv3;\nvarying vec3 vViewDir;\nvarying vec3 vNormalView;\n' +
+					shader.vertexShader.slice( bodyStart - 1, - 1 ) +
+					'    vUv3 = textureMatrix * vec4( position, 1.0 );' +
+					'    vViewDir = ( modelViewMatrix * vec4( position, 1.0 )).xyz;' +
+					'    vNormalView = normalize( (modelViewMatrix * vec4( normal, 0.0 )).xyz ); }'; // Calculate surface normal in view space
 
 			// Fragment Shader: Set Pixels to 9-tap box blur the current frame's Shadows
-			bodyStart	= shader.fragmentShader.indexOf( 'void main() {' );
+			bodyStart = shader.fragmentShader.indexOf( 'void main() {' );
 			shader.fragmentShader =
 				//'#define USE_UV\n' +
-                '\nuniform sampler2D tDiffuse; \n varying vec4 vUv3;\n' +
-				shader.fragmentShader.slice( 0, bodyStart ) +
-				shader.fragmentShader.slice( bodyStart - 1, - 1 ) +
-					`	gl_FragColor = vec4( mix( texture2DProj( tDiffuse,  vUv3 ).rgb, gl_FragColor.rgb , 0.5), 1.0 );
-				}`;
+				'\nuniform sampler2D tDiffuse; \nuniform float reflectivity; \n varying vec4 vUv3;\n varying vec3 vViewDir;\n varying vec3 vNormalView;\n' +
+					shader.fragmentShader.slice( 0, bodyStart ) +
+					shader.fragmentShader.slice( bodyStart - 1, - 1 ) +
+					`
+					float viewFactor = dot( normalize( vViewDir ), vNormalView );
+					vec4 textureColor = texture2DProj( tDiffuse, vUv3 );
+
+					if ( viewFactor < 0.0 ) {
+							// Viewed from above, apply reflections
+							gl_FragColor = vec4( mix( textureColor.rgb, gl_FragColor.rgb, 1.0 - reflectivity ), 1.0 );
+					} else {
+							// Viewed from below, apply transparency
+	            gl_FragColor = vec4( gl_FragColor.rgb, 0.5 ); // Use the texture, but make it semi-transparent
+					}
+					}`;
 
 			// Set the LightMap Accumulation Buffer
 			shader.uniforms.tDiffuse = { value: renderTarget.texture };
 			shader.uniforms.textureMatrix = { value: textureMatrix };
+			shader.uniforms.reflectivity = { value: reflectivity };
+
 			this.material.uniforms = shader.uniforms;
 
 			// Set the new Shader to this
 			this.material.userData.shader = shader;
-        };
-        this.receiveShadow = true;
+		};
 
+		this.receiveShadow = true;
+		this.material.transparent = true;
 
 		this.onBeforeRender = function ( renderer, scene, camera ) {
 

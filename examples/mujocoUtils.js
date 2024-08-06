@@ -685,7 +685,7 @@ export async function loadSceneFromURL(mujoco, filename, parent) {
     return [model, state, simulation, bodies, lights]
 }
 
-/** Downloads the scenes/examples folder to MuJoCo's virtual filesystem
+/** Downloads the scenes/examples folder to Emscripten/MuJoCo's virtual filesystem
  * @param {mujoco} mujoco */
 export async function downloadExampleScenesFolder(mujoco) {
   let allFiles = [

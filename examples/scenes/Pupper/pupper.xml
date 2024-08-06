@@ -15,7 +15,7 @@
 
     <material name="grid" texture="grid" texrepeat="1 1" texuniform="true" reflectance="0"/>
 
-    <material name="Carpet" texture="carpet"  specular="0.0" shininess="0.0" reflectance="0.1" texrepeat="1 1"/>
+    <material name="Carpet" texture="carpet"  specular="0.0" shininess="0.0" reflectance="0.1" texrepeat="2 2"/>
     <!-- <material name="Concrete" texture="Concrete"  specular="0.0" shininess="0.0" reflectance="0.1" texrepeat="1 1"/> -->
     <material name="dog_bowl" texture="dog_bowl"  specular="0.5" shininess="0.5"/>
     <material name="Eyes"     texture="Eyes"      specular="0.0" shininess="0.0" reflectance="0.1"/>
@@ -85,8 +85,8 @@
     <default class="visual">  <!-- purely visual, not involved in collision detection -->
       <geom type="mesh" contype="0" conaffinity="0"/>
 
-      <default class="actuator">  <geom group="1"/> </default>
-      <default class="body_part"> <geom group="2"/> </default>
+      <default class="actuator">    <geom group="1"/> </default>
+      <default class="body_part">   <geom group="2"/> </default>
       <default class="screen_display">
         <geom group="2" type="box" pos="0 -0.058 -0.096" size=".04 .04 .008" quat="0 0 0.3824995 0.9239557"/>
       </default>
@@ -128,11 +128,16 @@
   <worldbody>
     <!-- Environment -->
     <!-- <geom class="floor" size="0 0 .004" material="Slate"/> -->
-    <geom class="floor" size="2 2 .004" material="Oak"/>
+    <!-- <geom class="floor" size="2 2 .004" material="Oak"/> -->
+    <geom class="floor" size=".5 .3 .04" material="Carpet" rgba="1 1 1 .4"/>
     <light name="spotlight" mode="targetbodycom" target="base_link" pos="0 -4 4" diffuse="0.9 0.9 0.9" specular="0.3 0.3 0.3" cutoff="100" castshadow="false"/>
     <light pos="1 -1 1.5" dir="-1 1 -1" diffuse="0.5 0.5 0.5" directional="true"/>
     <camera name="tracking_cam" mode="targetbody" target="base_link" pos="0.5 -0.5 0.5"/>
-    <light diffuse=".5 .5 .5" pos="0 0 3" dir="0 0 -1"/>
+
+    <!-- <geom size=".1"/>
+    <geom type="ellipsoid" size=".05 .03 .02" pos=".2 .2 0" rgba=".11 .99 .66 1"/>
+    <geom type = "box" size=".05 .05 .05" pos="-.2 .2 0" rgba=".11 .99 .66 1"/> -->
+    <!-- <light diffuse=".5 .5 .5" pos="0 0 3" dir="0 0 -1"/> -->
 
     <body pos=".3 .15 0">
       <freejoint/>
