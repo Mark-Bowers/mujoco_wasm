@@ -5,13 +5,21 @@
     <texture type="skybox" builtin="gradient" rgb1=".3 .5 .7" rgb2="0 0 0" width="512" height="512"/>
     <texture name="grid" type="2d" builtin="checker" width="512" height="512" rgb1=".2 .4 .6" rgb2=".4 .6 .8"/>
 
+    <texture type="2d" name="dog_bowl" file="dog_bowl.png"/>
+    <texture type="2d"  file="carpet.png"/>
     <!-- <texture type="2d"  file="Concrete.png"/> -->
+    <texture type="2d"  file="Eyes.png"/>
+    <texture type="2d"  file="Marble.png"/>
     <texture type="2d"  file="Oak.png"/>
     <texture type="2d"  file="Slate.png"/>
 
     <material name="grid" texture="grid" texrepeat="1 1" texuniform="true" reflectance="0"/>
 
+    <material name="Carpet" texture="carpet"  specular="0.0" shininess="0.0" reflectance="0.1" texrepeat="1 1"/>
     <!-- <material name="Concrete" texture="Concrete"  specular="0.0" shininess="0.0" reflectance="0.1" texrepeat="1 1"/> -->
+    <material name="dog_bowl" texture="dog_bowl"  specular="0.5" shininess="0.5"/>
+    <material name="Eyes"     texture="Eyes"      specular="0.0" shininess="0.0" reflectance="0.1"/>
+    <material name="Marble"   texture="Marble"    specular="0.0" shininess="0.0" reflectance="0.1" texrepeat="2 1"/>
     <material name="Oak"      texture="Oak"       specular="0.0" shininess="0.0" reflectance="0.2" texrepeat="4 4"/>
     <material name="Slate"    texture="Slate"     specular="0.0" shininess="0.0" reflectance="0.1" texrepeat="4 3"/>
 
@@ -27,6 +35,8 @@
     <material name="Glass_(Grey)"           specular="0.5" shininess="0.5" rgba="0.701961 0.701961 0.701961 1.0"/>
     <material name="Plastic_Glossy_(Blue)"  specular="0.5" shininess="0.5" rgba="0.188235 0.231373 0.588235 1.0"/>
     <material name="Silicone_(QuickSilver)" specular="0.5" shininess="0.5" rgba="0.654902 0.654902 0.654902 1.0"/>
+
+    <mesh name="dog_bowl" file="dog_bowl.obj"/>
 
     <mesh name="BodyV4v70.001" file="BodyV4v70.001.stl"/>
 
@@ -77,6 +87,9 @@
 
       <default class="actuator">  <geom group="1"/> </default>
       <default class="body_part"> <geom group="2"/> </default>
+      <default class="screen_display">
+        <geom group="2" type="box" pos="0 -0.058 -0.096" size=".04 .04 .008" quat="0 0 0.3824995 0.9239557"/>
+      </default>
     </default>
 
     <!-- classes involved in collision detection -->
@@ -121,6 +134,11 @@
     <camera name="tracking_cam" mode="targetbody" target="base_link" pos="0.5 -0.5 0.5"/>
     <light diffuse=".5 .5 .5" pos="0 0 3" dir="0 0 -1"/>
 
+    <body pos=".3 .15 0">
+      <freejoint/>
+      <geom material="dog_bowl" mesh="dog_bowl" type="mesh" group="2"/>
+    </body>
+
     <!-- Pupper v3.2.2 -->
 
     <body name="base_link" pos="0 0 0.13">
@@ -133,10 +151,11 @@
         <geom mesh="Body_V4_Servos"   material="Plastic_Glossy_(Blue)"  class="body_part"/>
         <geom mesh="Body_V4_Glass"    material="Glass_(Grey)"           class="body_part"/>
         <geom mesh="Body_V4_Display"  material="Plastic_Glossy_(Black)" class="body_part"/>
+        <geom                         material="Eyes"                   class="screen_display"/>
         <geom mesh="Body_V4"          material="ABS_(LightMagenta)"     class="body_part"/>
         <geom mesh="Body_V4_Handle"   material="Silicone_(White)"       class="body_part"/>
 
-        <!-- <camera name="nose_camera" pos="0 0.0025 -0.143" quat="0 0 0 1"/> -->
+        <camera name="nose_camera" pos="0 0.0025 -0.143" quat="0 0 0 1"/>
       </body>
 
       <!-- Front right leg -->
@@ -331,33 +350,57 @@
   </actuator>
 
   <keyframe>
-    <!-- qpos="xyz, quat for Pupper
+    <!-- qpos="xyz, quat for dog bowl
+               xyz, quat for Pupper
                all 12 joint angles" -->
 
     <key  name="home"
-      qpos='0   0    0.13 1 0 0 0
+      qpos='0.3 0.15 0    1 0 0 0
+            0   0    0.13 1 0 0 0
             0 0 0 0 0 0 0 0 0 0 0 0'
       ctrl="0.0 0.0 0.0
             0.0 0.0 0.0
             0.0 0.0 0.0
             0.0 0.0 0.0"/>
 
+    <key  name="bowl_on_edge"
+      qpos='0.3 0.15 0.07     0.707 -0.05 -0.707 -0.05
+            0   0    0.13 1 0 0 0
+            0 0 0 0 0 0 0 0 0 0 0 0'/>
+<!-- <key qpos='0.326474 0.149628 0.0697835  0.707 -0.05 -0.707 -0.05
+  0 0 0.13 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0'/> -->
+
     <key name="sit"
-      qpos=' -0.048 0 0.1   1 0 -0.054 0
+      qpos='0.3 0.15 0    1 0 0 0
+           -0.048 0 0.1   1 0 -0.054 0
           0.0946345  0.0654377  0.235517
          -0.0947257 -0.0654284 -0.235546
           0.166518   0.113256   0.381256
          -0.166479  -0.113275  -0.381313'/>
 
     <key name="headstand"
-      qpos='0.111359 0.10614 0.151071    0.597843 -0.377542 0.597815 0.377707
+      qpos='0.3 0.15 0.07 1 0 1 0
+        0.111359 0.10614 0.151071    0.597843 -0.377542 0.597815 0.377707
         0.600724  0.00261665 -0.00550821
        -0.616206 -0.0124531   0.019582
        -0.693652  0.00242408 -0.689196
         0.693623  0.0191031   1.489196'/>
 
+    <!-- <key name="bowl_tilted" qpos='0.277336 0.309048 0.0378855 0.516785  0.54038  0.641898 0.169971 0 0 0.13 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0'/> -->
+    <!-- <key name="bowl_tilted" qpos='0.286454 0.344872 0.0746406 0.424006 -0.443103 0.539368 0.169971 0 0 0.13 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0'/> -->
+    <!-- <key name="bowl_edge"
+      qpos='0.5 -0.5 -0.5 0.5
+           -0.443103 0.539368 0.577027 -0.0477361
+           -5.97711e-06 0.0988816 0.
+           -8.38445e-06 -0.0539939 7.26801e-06
+            0.0946345 0.0654377 0.235517
+           -0.0947257 -0.0654284 -0.235546
+            0.166518 0.113256 0.381256
+           -0.166479 -0.113275 -0.381313'/> -->
+
     <key name="one handed"
-       qpos='0.0263519 0.0550288 0.250016   -0.502491 0.445046 -0.561378 -0.484037
+       qpos='0.3 0.15 0.07  0.707107 0 0.707107 0
+             0.0263519 0.0550288 0.250016   -0.502491 0.445046 -0.561378 -0.484037
              1.9132   -0.42       -1.145
             -0.616206 -0.0124531   0.019582
             -0.693652  0.00242408 -0.689196
