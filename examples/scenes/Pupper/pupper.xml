@@ -135,6 +135,8 @@
         <geom mesh="Body_V4_Display"  material="Plastic_Glossy_(Black)" class="body_part"/>
         <geom mesh="Body_V4"          material="ABS_(LightMagenta)"     class="body_part"/>
         <geom mesh="Body_V4_Handle"   material="Silicone_(White)"       class="body_part"/>
+
+        <!-- <camera name="nose_camera" pos="0 0.0025 -0.143" quat="0 0 0 1"/> -->
       </body>
 
       <!-- Front right leg -->
