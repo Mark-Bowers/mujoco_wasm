@@ -4,13 +4,15 @@
   <asset>
     <texture type="skybox" builtin="gradient" rgb1=".3 .5 .7" rgb2="0 0 0" width="512" height="512"/>
     <texture name="grid" type="2d" builtin="checker" width="512" height="512" rgb1=".2 .4 .6" rgb2=".4 .6 .8"/>
-    <material name="grid" texture="grid" texrepeat="1 1" texuniform="true" reflectance="0"/>
 
     <!-- <texture type="2d"  file="Concrete.png"/> -->
     <texture type="2d"  file="Oak.png"/>
     <texture type="2d"  file="Slate.png"/>
+
+    <material name="grid" texture="grid" texrepeat="1 1" texuniform="true" reflectance="0"/>
+
     <!-- <material name="Concrete" texture="Concrete"  specular="0.0" shininess="0.0" reflectance="0.1" texrepeat="1 1"/> -->
-    <material name="Oak"      texture="Oak"       specular="0.0" shininess="0.0" reflectance="0.1" texrepeat="4 4"/>
+    <material name="Oak"      texture="Oak"       specular="0.0" shininess="0.0" reflectance="0.2" texrepeat="4 4"/>
     <material name="Slate"    texture="Slate"     specular="0.0" shininess="0.0" reflectance="0.1" texrepeat="4 3"/>
 
     <material name="ABS_(LightMagenta)"     specular="0.5" shininess="0.5" rgba="1.000000 0.521569 1.000000 1.0"/>
@@ -73,8 +75,8 @@
     <default class="visual">  <!-- purely visual, not involved in collision detection -->
       <geom type="mesh" contype="0" conaffinity="0"/>
 
-      <default class="actuator">      <geom group="1"/> </default>
-      <default class="body_part">     <geom group="2"/> </default>
+      <default class="actuator">  <geom group="1"/> </default>
+      <default class="body_part"> <geom group="2"/> </default>
     </default>
 
     <!-- classes involved in collision detection -->
@@ -117,6 +119,7 @@
     <light name="spotlight" mode="targetbodycom" target="base_link" pos="0 -4 4" diffuse="0.9 0.9 0.9" specular="0.3 0.3 0.3" cutoff="100" castshadow="false"/>
     <light pos="1 -1 1.5" dir="-1 1 -1" diffuse="0.5 0.5 0.5" directional="true"/>
     <camera name="tracking_cam" mode="targetbody" target="base_link" pos="0.5 -0.5 0.5"/>
+    <light diffuse=".5 .5 .5" pos="0 0 3" dir="0 0 -1"/>
 
     <!-- Pupper v3.2.2 -->
 
@@ -324,5 +327,39 @@
     <general joint="leg_back_l_2" name="leg_back_l_2"/>
     <general joint="leg_back_l_3" name="leg_back_l_3"/>
   </actuator>
+
+  <keyframe>
+    <!-- qpos="xyz, quat for Pupper
+               all 12 joint angles" -->
+
+    <key  name="home"
+      qpos='0   0    0.13 1 0 0 0
+            0 0 0 0 0 0 0 0 0 0 0 0'
+      ctrl="0.0 0.0 0.0
+            0.0 0.0 0.0
+            0.0 0.0 0.0
+            0.0 0.0 0.0"/>
+
+    <key name="sit"
+      qpos=' -0.048 0 0.1   1 0 -0.054 0
+          0.0946345  0.0654377  0.235517
+         -0.0947257 -0.0654284 -0.235546
+          0.166518   0.113256   0.381256
+         -0.166479  -0.113275  -0.381313'/>
+
+    <key name="headstand"
+      qpos='0.111359 0.10614 0.151071    0.597843 -0.377542 0.597815 0.377707
+        0.600724  0.00261665 -0.00550821
+       -0.616206 -0.0124531   0.019582
+       -0.693652  0.00242408 -0.689196
+        0.693623  0.0191031   1.489196'/>
+
+    <key name="one handed"
+       qpos='0.0263519 0.0550288 0.250016   -0.502491 0.445046 -0.561378 -0.484037
+             1.9132   -0.42       -1.145
+            -0.616206 -0.0124531   0.019582
+            -0.693652  0.00242408 -0.689196
+             0.693623  0.0191031   1.7575'/>
+  </keyframe>
 
 </mujoco>
