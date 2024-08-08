@@ -45,6 +45,55 @@ export function setupGUI(parentContext) {
     "Balloons": "balloons.xml", "Mug": "mug.xml"
   }).name('Example Scene').onChange(reload);
 
+  const model = parentContext.model;
+
+  function setFloorMaterialFunc() {
+    if (this.floor) {
+      const material = this.materials[this.params.floor];
+      this.floor.material.color = material.color;
+      this.floor.material.map = material.map;
+    }
+  }
+
+  // Add Appearance folder with Floor selector dropdown.
+  let appearanceFolder = parentContext.gui.addFolder("Appearance");
+
+  // Function to create the dropdown
+  const addFloorSelector = (model, simulation, params) => {
+    // Generate the floor material options for the dropdown dynamically.
+    let dropdownContents = {};
+
+    if (parentContext.floor) {
+      // Initial value
+      parentContext.params.floor = parentContext.floor.material.name;
+
+      // Dropdown options
+      for (const [m, material] of Object.entries(parentContext.materials)) {
+        dropdownContents[material.name] = m;
+      }
+    } else {
+      // Don't have floor to assign materials to
+      appearanceFolder.hide();
+    }
+
+    // Add floor material selection dropdown using the generated options.
+    let dropdown = appearanceFolder.add(parentContext.params, 'floor', dropdownContents);
+    dropdown.name('Floor material');
+    dropdown.onChange(setFloorMaterialFunc.bind(parentContext));
+
+    return dropdown;
+  };
+
+  // Call the function to create the dropdown
+  let floorSelectorDropdown = addFloorSelector(parentContext.model, parentContext.simulation, parentContext.params);
+
+  // Push dropdown refresh steps (called on reload (reloadFunc))
+  parentContext.updateGUICallbacks.push((model, simulation, params) => {
+    floorSelectorDropdown.destroy();
+    floorSelectorDropdown = addFloorSelector(model, simulation, parentContext.params);
+    parentContext.floor ? appearanceFolder.show() : appearanceFolder.hide();
+  });
+
   // Add a help menu.
   // Parameters:
   //  Name: "Help".
@@ -220,8 +269,8 @@ export function setupGUI(parentContext) {
   });
 
   // Add sliders for ctrlnoiserate and ctrlnoisestd; min = 0, max = 2, step = 0.01.
-  simulationFolder.add(parentContext.params, 'ctrlnoiserate', 0.0, 2.0, 0.01).name('Noise rate' );
-  simulationFolder.add(parentContext.params, 'ctrlnoisestd' , 0.0, 2.0, 0.01).name('Noise scale');
+  simulationFolder.add(parentContext.params, 'ctrlnoiserate', 0.0, 1.0, 0.01).name('Noise rate' );
+  simulationFolder.add(parentContext.params, 'ctrlnoisestd' , 0.0, 1.0, 0.01).name('Noise scale');
 
   function actuatorName(model, actuatorId) {
     return decodeName(model, model.name_actuatoradr[actuatorId]);
@@ -369,6 +418,12 @@ function getBufferGeometry(model, meshId, body, meshes) {
   return geometry;
 }
 
+const infiniteDistance = 50;
+
+function geomName(model, geomId) {
+  return decodeName(model, model.name_geomadr[geomId]);
+}
+
 function getGeometry(mujoco, model, geomId, body, meshes) {
   const type = model.geom_type[geomId];
   const size = subarray(model.geom_size, geomId, 3);
@@ -377,8 +432,8 @@ function getGeometry(mujoco, model, geomId, body, meshes) {
 
   if (type == mujoco.mjtGeom.mjGEOM_PLANE.value) {
     // TODO: 0 values should be set to the far clipping plane rather than 100
-    const x = size[0] == 0 ? 100 : size[0] * 2;
-    const y = size[1] == 0 ? 100 : size[1] * 2;
+    const x = size[0] == 0 ? infiniteDistance : size[0] * 2;
+    const y = size[1] == 0 ? infiniteDistance : size[1] * 2;
     geometry = new THREE.PlaneGeometry(x, y);
   } else if (type == mujoco.mjtGeom.mjGEOM_HFIELD.value) {
     // TODO: Implement height field.
@@ -399,6 +454,8 @@ function getGeometry(mujoco, model, geomId, body, meshes) {
   } else {    // Set the default geometry. In MuJoCo, this is a sphere.
     geometry = new THREE.SphereGeometry(size[0] * 0.5);
   }
+
+  geometry.name = geomName(model, geomId);
 
   return geometry;
 }
@@ -477,15 +534,19 @@ function createMaterial(model, matId, textures) {
     if (texture == undefined) {
       texture = createTexture(model, texId, textures);
     }
+    const notSet = texture.wrapS == THREE.ClampToEdgeWrapping
+                && texture.wrapT == THREE.ClampToEdgeWrapping;
     const mat_texrepeat = subarray(model.mat_texrepeat, matId, 2)
-    const set_repeat = mat_texrepeat[0] != texture.repeat.x || mat_texrepeat[1] != texture.repeat.x;
-    if (set_repeat) {             // Set texture.repeat to match mat_texrepeat
-      if (texture.repeat.x != 1 || texture.repeat.y != 1) {
-        // TODO: Need to copy texture object and set texrepeat
-      }
+    const settingsDiffer = mat_texrepeat[0] != texture.repeat.x || mat_texrepeat[1] != texture.repeat.x;
+    if (notSet) {
       texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
       texture.repeat.set(...mat_texrepeat);   // TODO: Test cube wrapping
       texture.needsUpdate = true;
+    } else if (settingsDiffer) {
+        // TODO: Need to copy texture object and set texrepeat
+        console.warn("repeat already set for texture: " + texture.name);
+    } else {
+      console.log("material(" + name + ") reuses " + texture.name + " texture with the same texrepeat values")
     }
     matProperties.map = texture;  // Assign the texture to the material
   }
@@ -502,6 +563,7 @@ function getMaterial(model, g, materials, textures) {
     material = materials[matId];
     if (material == undefined) {        // material has not been created yet
       material = materials[matId] = createMaterial(model, matId, textures);
+      material.matId = matId;
     }
   } else {                              // geom does not specify a material; use geom color
     const geom_rgba = subarray(model.geom_rgba, g, 4);  // geom rgba color
@@ -509,19 +571,28 @@ function getMaterial(model, g, materials, textures) {
     material = materials[name];         // Check if material already exists
 
     if (!material) {                    // Need to create a new material
-      material = new THREE.MeshPhysicalMaterial(createMatProperties(name, ...geom_rgba));
-      materials[name] = material;       // Save the new material indexed by name
+      const matProperties = createMatProperties(name, ...geom_rgba);
+      material = materials[name] = new THREE.MeshPhysicalMaterial(matProperties);
+      material.matId = matId;
     }
   }
 
   return material;
 }
 
-function createMesh(mujoco, model, g, geometry, material, body) {
+function createMesh(mujoco, model, g, geometry, material, body, parent) {
   let mesh = undefined;
 
   const geom_type = model.geom_type[g];
   if (geom_type == mujoco.mjtGeom.mjGEOM_PLANE.value) {
+    if (material.map) {
+      const texuniform = model.mat_texuniform[material.matId];
+
+      if (texuniform) {
+        material.map.repeat.x *= geometry.parameters.width / 2;
+        material.map.repeat.y *= geometry.parameters.height / 2;
+      }
+    }
     mesh = new Reflector( geometry, {
       color: material.color,
       clipBias: 0.003,
@@ -532,6 +603,9 @@ function createMesh(mujoco, model, g, geometry, material, body) {
 
     mesh.castShadow = false;                  // The (floor) plane recieves shadows, but does not cast them
     mesh.receiveShadow = true;
+
+    mesh.material.name = material.name;       // We won't have to do this when Reflector takes a material
+    parent.floor = mesh;
   } else {
     mesh = new THREE.Mesh(geometry, material);
 
@@ -629,6 +703,8 @@ export async function loadSceneFromURL(mujoco, filename, parent) {
     mujocoRoot.name = "MuJoCo Root"
     parent.scene.add(mujocoRoot);
 
+    parent.floor = null;
+
     /** @type {Object.<number, THREE.Group>} */
     let bodies = {};
 
@@ -658,7 +734,14 @@ export async function loadSceneFromURL(mujoco, filename, parent) {
       const material = getMaterial(model, g, materials, textures);
 
       // Create mesh from geometry
-      createMesh(mujoco, model, g, geometry, material, body);
+      createMesh(mujoco, model, g, geometry, material, body, parent);
+    }
+
+    // Add any unused materials to materials array
+    for (let m = 0; m < model.nmat; m++) {
+      if (materials[m] == undefined) {
+        materials[m] = createMaterial(model, m, textures);
+      }
     }
 
     createTendons(mujocoRoot);
@@ -681,6 +764,7 @@ export async function loadSceneFromURL(mujoco, filename, parent) {
     }
 
     parent.mujocoRoot = mujocoRoot;
+    parent.materials = materials;
 
     return [model, state, simulation, bodies, lights]
 }
@@ -733,10 +817,12 @@ export async function downloadExampleScenesFolder(mujoco) {
     "Pupper/assets/carpet.png",
     // "Pupper/assets/CLS6336HV.png",
     // "Pupper/assets/Concrete.png",
-    // "Pupper/assets/Fir.png",
     "Pupper/assets/dog_bowl.obj",
     "Pupper/assets/dog_bowl.png",
     "Pupper/assets/Eyes.png",
+    // "Pupper/assets/Dunes.png",
+    "Pupper/assets/Grass.png",
+    // "Pupper/assets/Fir.png",
     // "Pupper/assets/Fir2D.png",
     "Pupper/assets/GIM4305_Mounting_Disc.stl",
     "Pupper/assets/GIM4305_Servo_Motor.stl",
@@ -748,6 +834,7 @@ export async function downloadExampleScenesFolder(mujoco) {
     "Pupper/assets/Lower_Leg_V6_2.obj",
     "Pupper/assets/Marble.png",
     "Pupper/assets/Oak.png",
+    // "Pupper/assets/Sand.png",
     "Pupper/assets/Slate.png",
     "Pupper/assets/Upper_Leg_0.obj",
     "Pupper/assets/Upper_Leg_1.obj",

@@ -5,22 +5,28 @@
     <texture type="skybox" builtin="gradient" rgb1=".3 .5 .7" rgb2="0 0 0" width="512" height="512"/>
     <texture name="grid" type="2d" builtin="checker" width="512" height="512" rgb1=".2 .4 .6" rgb2=".4 .6 .8"/>
 
-    <texture type="2d" name="dog_bowl" file="dog_bowl.png"/>
     <texture type="2d"  file="carpet.png"/>
     <!-- <texture type="2d"  file="Concrete.png"/> -->
+    <texture type="2d"  file="dog_bowl.png"/>
+    <!-- <texture type="2d"  file="Dunes.png"/> -->
+    <texture type="2d"  file="Grass.png"/>
     <texture type="2d"  file="Eyes.png"/>
     <texture type="2d"  file="Marble.png"/>
     <texture type="2d"  file="Oak.png"/>
+    <!-- <texture type="2d"  file="Sand.png"/> -->
     <texture type="2d"  file="Slate.png"/>
 
     <material name="grid" texture="grid" texrepeat="1 1" texuniform="true" reflectance="0"/>
 
     <material name="Carpet" texture="carpet"  specular="0.0" shininess="0.0" reflectance="0.1" texrepeat="2 2"/>
     <!-- <material name="Concrete" texture="Concrete"  specular="0.0" shininess="0.0" reflectance="0.1" texrepeat="1 1"/> -->
-    <material name="dog_bowl" texture="dog_bowl"  specular="0.5" shininess="0.5"/>
+    <material name="Bowl"     texture="dog_bowl"  specular="0.5" shininess="0.5"/>
+    <!-- <material name="Dunes"    texture="Dunes"     specular="0.0" shininess="0.0" reflectance="0.1" texrepeat="30 20"/> -->
+    <material name="Grass"    texture="Grass"     specular="0.0" shininess="0.0" reflectance="0.1" texrepeat="15 10"/>
     <material name="Eyes"     texture="Eyes"      specular="0.0" shininess="0.0" reflectance="0.1"/>
     <material name="Marble"   texture="Marble"    specular="0.0" shininess="0.0" reflectance="0.1" texrepeat="2 1"/>
-    <material name="Oak"      texture="Oak"       specular="0.0" shininess="0.0" reflectance="0.2" texrepeat="4 4"/>
+    <material name="Oak"      texture="Oak"       specular="0.0" shininess="0.0" reflectance="0.2" texrepeat="4 4" texuniform="true"/>
+    <!-- <material name="Sand"     texture="Sand"      specular="0.0" shininess="0.0" reflectance="0.1" texrepeat="30 20"/> -->
     <material name="Slate"    texture="Slate"     specular="0.0" shininess="0.0" reflectance="0.1" texrepeat="4 3"/>
 
     <material name="ABS_(LightMagenta)"     specular="0.5" shininess="0.5" rgba="1.000000 0.521569 1.000000 1.0"/>
@@ -32,11 +38,11 @@
     <material name="Polyurethane"           specular="0.1" shininess="0.1" rgba="0.200000 0.200000 0.200000 1.0"/>
     <material name="Silicone_(White)"       specular="0.5" shininess="0.5" rgba="0.964706 0.964706 0.952941 1.0"/>
     <material name="Plastic_Glossy_(Black)" specular="0.5" shininess="0.5" rgba="0.098039 0.098039 0.098039 1.0"/>
-    <material name="Glass_(Grey)"           specular="0.5" shininess="0.5" rgba="0.701961 0.701961 0.701961 1.0"/>
+    <material name="Glass_(Gray)"           specular="0.5" shininess="0.5" rgba="0.701961 0.701961 0.701961 1.0"/>
     <material name="Plastic_Glossy_(Blue)"  specular="0.5" shininess="0.5" rgba="0.188235 0.231373 0.588235 1.0"/>
     <material name="Silicone_(QuickSilver)" specular="0.5" shininess="0.5" rgba="0.654902 0.654902 0.654902 1.0"/>
 
-    <mesh name="dog_bowl" file="dog_bowl.obj"/>
+    <mesh name="Bowl" file="dog_bowl.obj"/>
 
     <mesh name="BodyV4v70.001" file="BodyV4v70.001.stl"/>
 
@@ -128,7 +134,7 @@
   <worldbody>
     <!-- Environment -->
     <!-- <geom class="floor" size="0 0 .004" material="Slate"/> -->
-    <geom class="floor" size="2 2 .004" material="Oak"/>
+    <geom class="floor" size="1 1  .004" material="Oak"/>
     <!-- <geom class="floor" size=".5 .3 .04" material="Carpet" rgba="1 1 1 .4"/> -->
     <light name="spotlight" mode="targetbodycom" target="base_link" pos="0 -4 4" diffuse="0.9 0.9 0.9" specular="0.3 0.3 0.3" cutoff="100" castshadow="false"/>
     <light pos="1 -1 1.5" dir="-1 1 -1" diffuse="0.5 0.5 0.5" directional="true"/>
@@ -141,7 +147,7 @@
 
     <body pos=".3 .15 0">
       <freejoint/>
-      <geom material="dog_bowl" mesh="dog_bowl" type="mesh" group="2"/>
+      <geom material="Bowl" mesh="Bowl" type="mesh" group="2"/>
     </body>
 
     <!-- Pupper v3.2.2 -->
@@ -154,7 +160,7 @@
         <geom mesh="Body_V4_Strap"    material="Silicone_(QuickSilver)" class="body_part"/>
         <geom mesh="Body_V4_Ears"     material="ABS_(DodgerBlue)"       class="body_part"/>
         <geom mesh="Body_V4_Servos"   material="Plastic_Glossy_(Blue)"  class="body_part"/>
-        <geom mesh="Body_V4_Glass"    material="Glass_(Grey)"           class="body_part"/>
+        <geom mesh="Body_V4_Glass"    material="Glass_(Gray)"           class="body_part"/>
         <geom mesh="Body_V4_Display"  material="Plastic_Glossy_(Black)" class="body_part"/>
         <geom                         material="Eyes"                   class="screen_display"/>
         <geom mesh="Body_V4"          material="ABS_(LightMagenta)"     class="body_part"/>
